@@ -4,15 +4,17 @@ import { FrequencyControls } from './FrequencyControls'
 import { AmplitudeControls } from './AmplitudeControls'
 import { BandwidthControls } from './BandwidthControls'
 import { TraceControls } from './TraceControls'
+import { TraceMathControls } from './TraceMathControls'
 import { MarkerControls } from './MarkerControls'
 import { SignalSimControls } from './SignalSimControls'
 import type { AnalyzerStateValues } from '../../hooks/useAnalyzerState'
-import type { TraceState } from '../../hooks/useTraces'
+import type { TraceState, TraceMath } from '../../hooks/useTraces'
 import type { TraceMode, SignalConfig } from '../../dsp/types'
 
 interface Props {
   analyzerState: AnalyzerStateValues; traces: TraceState[]
   setTraceMode: (index: number, mode: TraceMode) => void; signals: SignalConfig[]
+  traceMath: TraceMath; setTraceMath: (m: TraceMath) => void; spectrumData: Map<number, Float32Array>
   onToggleSignal: (id: string) => void; onAddSignal: () => void; onEditSignal: (id: string) => void; onLoadPreset: () => void
   onAddMarker: () => void; onAddDelta: () => void; onPeakSearch: () => void
   onMarkerToCenter: () => void; onNdbBw: () => void; onBandPower: () => void; onClearAllMarkers: () => void
@@ -56,7 +58,9 @@ export function ControlSidebar(props: Props) {
       <Section title="FREQUENCY" tour="frequency"><FrequencyControls state={props.analyzerState} /></Section>
       <Section title="AMPLITUDE"><AmplitudeControls state={props.analyzerState} /></Section>
       <Section title="BW / SWEEP" tour="bandwidth"><BandwidthControls state={props.analyzerState} /></Section>
-      <Section title="TRACES" tour="traces"><TraceControls traces={props.traces} setTraceMode={props.setTraceMode} /></Section>
+      <Section title="TRACES" tour="traces"><TraceControls traces={props.traces} setTraceMode={props.setTraceMode}
+          mathResult={props.traceMath.enabled && props.traceMath.result !== props.traceMath.traceA && props.traceMath.result !== props.traceMath.traceB ? props.traceMath.result : undefined} />
+        <TraceMathControls traces={props.traces} traceMath={props.traceMath} setTraceMath={props.setTraceMath} spectrumData={props.spectrumData} /></Section>
       <Section title="MARKERS" tour="markers">
         <MarkerControls onAddMarker={props.onAddMarker} onAddDelta={props.onAddDelta} onPeakSearch={props.onPeakSearch}
           onMarkerToCenter={props.onMarkerToCenter} onNdbBw={props.onNdbBw} onBandPower={props.onBandPower} onClearAll={props.onClearAllMarkers} />

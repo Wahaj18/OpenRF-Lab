@@ -32,7 +32,7 @@ export function applyTraceMode(current: Float64Array, buf: TraceBuffer, mode: Tr
   }
 }
 
-/** Trace math in the power domain: A + B adds powers, A − B is the dB difference. */
+/** Trace math on dB traces. A − B: dB difference (= 10·log10 of the power ratio). A + B: linear power sum, back in dBm. */
 export function traceMath(a: Float64Array, b: Float64Array, op: 'add' | 'subtract'): Float64Array {
   const out = new Float64Array(Math.min(a.length, b.length))
   for (let i = 0; i < out.length; i++) {

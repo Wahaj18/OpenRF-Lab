@@ -1,13 +1,11 @@
 import { useState, useCallback } from 'react'
-import type { TraceMode } from '../dsp/types'
+import type { TraceMode, TraceMathConfig } from '../dsp/types'
 
 export interface TraceState {
   index: number; mode: TraceMode; enabled: boolean; color: string; visible: boolean
 }
 
-export interface TraceMath {
-  enabled: boolean; operation: 'add' | 'subtract'; traceA: number; traceB: number
-}
+export type TraceMath = TraceMathConfig
 
 const DEFAULT_COLORS = ['#00e5ff', '#00ff88', '#ff6b6b', '#ffcc00', '#c084fc', '#ff8c00']
 
@@ -19,7 +17,7 @@ export function useTraces() {
     }))
   )
   const [traceMath, setTraceMath] = useState<TraceMath>({
-    enabled: false, operation: 'subtract', traceA: 0, traceB: 1,
+    enabled: false, operation: 'subtract', traceA: 0, traceB: 1, result: 2,
   })
 
   const setTraceMode = useCallback((index: number, mode: TraceMode) => {

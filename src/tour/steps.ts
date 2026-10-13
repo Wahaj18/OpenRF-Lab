@@ -16,6 +16,7 @@ export const TOURS: Partial<Record<RouteId, TourStep[]>> = {
     { target: 'frequency', controls: true, title: 'Frequency and span', body: 'Center is the middle of the screen; span is the width shown.' },
     { target: 'bandwidth', controls: true, title: 'Resolution bandwidth', body: 'Narrower RBW separates close tones and lowers the noise floor.' },
     { target: 'traces', controls: true, title: 'Traces', body: 'Max Hold catches intermittent signals; Average smooths noise.' },
+    { target: 'traces', controls: true, title: 'Trace math', body: 'Set a result trace to A − B (dB difference) or A + B (power sum).' },
     { target: 'markers', controls: true, title: 'Markers', body: 'Tap the spectrum or use Peak Search. Drag to move a marker.' },
     { target: 'markers', controls: true, title: 'Delta marker', body: '“+ Delta” reads Δ frequency and Δ level against the previous marker.' },
     { target: 'spectrum', title: 'Spectrum', body: 'Frequency left to right, power bottom to top.' },

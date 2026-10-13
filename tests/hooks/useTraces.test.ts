@@ -28,3 +28,10 @@ describe('useTraces', () => {
     expect(result.current.traces[0].color).toBe('#ff0000')
   })
 })
+
+describe('useTraces trace math', () => {
+  it('defaults to off, T3 = T1 − T2', () => {
+    const { result } = renderHook(() => useTraces())
+    expect(result.current.traceMath).toEqual({ enabled: false, operation: 'subtract', traceA: 0, traceB: 1, result: 2 })
+  })
+})

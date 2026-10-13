@@ -25,6 +25,12 @@ export interface AnalyzerConfig {
   detectorType: DetectorType
   sweepMode: 'continuous' | 'single' | 'off'
   traces: TraceConfig[]
+  traceMath?: TraceMathConfig
+}
+
+/** result = A op B. 'subtract' is the dB difference (power ratio A/B); 'add' sums linear power. */
+export interface TraceMathConfig {
+  enabled: boolean; operation: 'add' | 'subtract'; traceA: number; traceB: number; result: number
 }
 
 export interface TraceConfig {

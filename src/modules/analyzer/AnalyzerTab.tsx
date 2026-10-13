@@ -24,7 +24,7 @@ const PRESET_SIGNALS: SignalConfig[] = [
 export function AnalyzerTab() {
   const engine = useSignalEngine()
   const analyzerState = useAnalyzerState()
-  const { traces, setTraceMode } = useTraces()
+  const { traces, setTraceMode, traceMath, setTraceMath } = useTraces()
   const {
     markers, addMarker, addDeltaMarker, addBandPowerMarker,
     addNdbMarker, removeMarker, moveMarker, clearAllMarkers, peakSearch,
@@ -68,13 +68,14 @@ export function AnalyzerTab() {
       detectorType: analyzerState.detectorType,
       sweepMode: analyzerState.sweepMode,
       traces: traces.map(t => ({ index: t.index, mode: t.mode, enabled: t.enabled })),
+      traceMath,
     }
     engine.configure(config)
   }, [
     analyzerState.centerFreq, analyzerState.span, analyzerState.rbw,
     analyzerState.vbw, analyzerState.refLevel, analyzerState.scale,
     analyzerState.windowType, analyzerState.detectorType, analyzerState.sweepMode,
-    traces, engine.configure,
+    traces, traceMath, engine.configure,
   ])
 
   // Send signals to engine when they change
@@ -165,6 +166,9 @@ export function AnalyzerTab() {
     addMarker(frequency, amplitude, 0)
   }, [addMarker])
 
+  const mathActive = traceMath.enabled && traceMath.result !== traceMath.traceA && traceMath.result !== traceMath.traceB
+  // A − B is a ratio around 0 dB: draw it with 0 dB on the centre line
+  const diffZero = analyzerState.refLevel - analyzerState.scale * 5 - analyzerState.offset
   const liveMarkers = withLiveLevels(markers, engine.spectrumData, analyzerState.startFreq, analyzerState.span)
 
   // Layout: 60% spectrum, 40% waterfall
@@ -180,6 +184,9 @@ export function AnalyzerTab() {
           analyzerState={analyzerState}
           traces={traces}
           setTraceMode={setTraceMode}
+          traceMath={traceMath}
+          setTraceMath={setTraceMath}
+          spectrumData={engine.spectrumData}
           signals={signals}
           onToggleSignal={handleToggleSignal}
           onAddSignal={handleAddSignal}
@@ -203,7 +210,8 @@ export function AnalyzerTab() {
               height={spectrumHeight}
               spectrumData={engine.spectrumData}
               traceColors={traces.map(t => t.color)}
-              traceVisible={traces.map(t => t.visible)}
+              traceVisible={traces.map(t => t.visible && (mathActive && t.index === traceMath.result ? true : t.enabled))}
+              traceShift={traces.map(t => mathActive && traceMath.operation === 'subtract' && t.index === traceMath.result ? diffZero : 0)}
               refLevel={analyzerState.refLevel}
               scale={analyzerState.scale}
               numDivY={10}

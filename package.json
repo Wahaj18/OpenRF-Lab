@@ -17,7 +17,7 @@
     "electron:build:portable": "vite build && electron-builder --win portable",
     "electron:build:dir": "vite build && electron-builder --win dir",
     "test": "vitest run",
-    "test:ui": "node e2e/readouts.mjs"
+    "test:ui": "node e2e/readouts.mjs && node e2e/trace-math.mjs"
   },
   "build": {
     "appId": "io.github.wahaj18.openrflab",

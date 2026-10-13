@@ -12,12 +12,14 @@ interface SpectrumCanvasProps {
   startFreq: number
   stopFreq: number
   offset?: number
+  /** extra dB added when drawing each trace (e.g. to centre an A − B result) */
+  traceShift?: number[]
   onClickSpectrum?: (frequency: number, amplitude: number) => void
 }
 
 export function SpectrumCanvas({
   width, height, spectrumData, traceColors, traceVisible,
-  refLevel, scale, numDivY = 10, startFreq, stopFreq, offset = 0, onClickSpectrum,
+  refLevel, scale, numDivY = 10, startFreq, stopFreq, offset = 0, traceShift, onClickSpectrum,
 }: SpectrumCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const totalDbRange = scale * numDivY
@@ -58,16 +60,17 @@ export function SpectrumCanvas({
       ctx.strokeStyle = traceColors[traceIndex] ?? '#00e5ff'
       ctx.lineWidth = traceIndex === 0 ? 1.5 : 1
       ctx.globalAlpha = traceIndex === 0 ? 1 : 0.7
+      const shift = traceShift?.[traceIndex] ?? 0
       ctx.beginPath()
       for (let i = 0; i < data.length; i++) {
         const x = binToX(i, data.length)
-        const y = Math.max(0, Math.min(height, dbToY(data[i])))
+        const y = Math.max(0, Math.min(height, dbToY(data[i] + shift)))
         if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y)
       }
       ctx.stroke()
       ctx.globalAlpha = 1
     })
-  }, [width, height, spectrumData, traceColors, traceVisible, refLevel, scale, numDivY, dbToY, binToX])
+  }, [width, height, spectrumData, traceColors, traceVisible, traceShift, refLevel, scale, numDivY, dbToY, binToX])
 
   const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!onClickSpectrum) return

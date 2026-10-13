@@ -1,7 +1,7 @@
 import { computeSweep, DISPLAY_BINS } from './sweep'
 import type { FHSSState } from './signals/hopper'
 import type { AnalyzerConfig, EngineCommand, SignalConfig } from './types'
-import { applyTraceMode, newTraceBuffer } from './traceModes'
+import { applyTraceMode, newTraceBuffer, traceMath } from './traceModes'
 
 let config: AnalyzerConfig = {
   centerFreq: 2.437e9, span: 100e6, rbw: 100e3, vbw: 100e3,
@@ -57,12 +57,19 @@ function runSweepLoop() {
 function runSingleSweep() {
   const detected = computeSweep(config, signals, fhssStates)
 
+  const m = config.traceMath
+  const mathOn = !!m?.enabled && m.result !== m.traceA && m.result !== m.traceB
+  const latest = new Map<number, Float64Array>()
   for (const trace of config.traces) {
+    if (mathOn && trace.index === m!.result) continue
     if (!trace.enabled || trace.mode === 'off') continue
     const result = applyTraceMode(detected, traceBuffers[trace.index], trace.mode)
-    const transferable = new Float32Array(result.length)
-    for (let i = 0; i < result.length; i++) transferable[i] = result[i]
-    self.postMessage({ type: 'spectrum', data: transferable, traceIndex: trace.index }, { transfer: [transferable.buffer] })
+    latest.set(trace.index, result)
+    post(result, trace.index)
+  }
+  if (mathOn) {
+    const a = latest.get(m!.traceA), b = latest.get(m!.traceB)
+    if (a && b) post(traceMath(a, b, m!.operation), m!.result)
   }
 
   const waterfallRow = new Float32Array(DISPLAY_BINS)
@@ -71,6 +78,12 @@ function runSingleSweep() {
 
   sweepCount++
   if (sweepCount % 30 === 0) postStatus()
+}
+
+function post(result: Float64Array, traceIndex: number) {
+  const transferable = new Float32Array(result.length)
+  for (let i = 0; i < result.length; i++) transferable[i] = result[i]
+  self.postMessage({ type: 'spectrum', data: transferable, traceIndex }, { transfer: [transferable.buffer] })
 }
 
 function postStatus() { self.postMessage({ type: 'status', running, sweepCount }) }
