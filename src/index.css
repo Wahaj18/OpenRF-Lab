@@ -1,0 +1,70 @@
+@import 'tailwindcss';
+
+@layer base {
+  :root {
+    --sf-bg-primary: #0a0e1a;
+    --sf-bg-panel: #0d1320;
+    --sf-bg-control: #060b16;
+    --sf-bg-toolbar: #111827;
+    --sf-border: #1e3a5f;
+    --sf-text-primary: #c8d6e5;
+    --sf-text-muted: #8892a4;
+    --sf-text-dim: #4a6580;
+    --sf-accent-blue: #00e5ff;
+    --sf-accent-green: #00ff88;
+    --sf-marker-yellow: #ffcc00;
+    --sf-marker-orange: #ff8c00;
+    --sf-marker-red: #ff6b6b;
+    --sf-marker-purple: #c084fc;
+  }
+
+  [data-theme='light'] {
+    --sf-bg-primary: #f8fafc;
+    --sf-bg-panel: #f1f5f9;
+    --sf-bg-control: #ffffff;
+    --sf-bg-toolbar: #e2e8f0;
+    --sf-border: #cbd5e1;
+    --sf-text-primary: #1e293b;
+    --sf-text-muted: #475569;
+    --sf-text-dim: #94a3b8;
+    --sf-accent-blue: #0891b2;
+    --sf-accent-green: #059669;
+    --sf-marker-yellow: #ca8a04;
+    --sf-marker-orange: #ea580c;
+    --sf-marker-red: #dc2626;
+    --sf-marker-purple: #9333ea;
+  }
+
+  body {
+    background-color: var(--sf-bg-primary);
+    color: var(--sf-text-primary);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    margin: 0;
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  /* Scrollbar styling to match theme */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--sf-border) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--sf-border);
+    border-radius: 3px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--sf-text-dim);
+  }
+}
