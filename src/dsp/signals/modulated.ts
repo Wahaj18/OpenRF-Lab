@@ -21,9 +21,10 @@ export function generateModulated(params: ModulatedParams): Float64Array {
       break
     }
     case 'fm': {
+      // Tone FM with index beta: phase = wc·n + beta·sin(wm·n). Message at
+      // bandwidth/4 so Carson's rule 2(beta+1)fm equals the bandwidth at beta = 1.
       const wm = (2 * Math.PI * (bandwidth / 4)) / sampleRate
-      let phase = 0
-      for (let n = 0; n < numSamples; n++) { phase += wc + modulationIndex * Math.sin(wm * n); samples[n] = amplitude * Math.cos(phase) }
+      for (let n = 0; n < numSamples; n++) samples[n] = amplitude * Math.cos(wc * n + modulationIndex * Math.sin(wm * n))
       break
     }
     case 'bpsk': {
@@ -47,11 +48,15 @@ export function generateModulated(params: ModulatedParams): Float64Array {
       const order = type === 'qam16' ? 16 : 64
       const sqrtOrder = Math.sqrt(order)
       const samplesPerSymbol = Math.max(1, Math.floor(sampleRate / (bandwidth / Math.log2(order))))
+      // Scale the grid to unit average symbol energy so the signal has the set power
+      const half = (sqrtOrder - 1) / 2
+      const es = (2 * (order - 1)) / 3 / (half * half)
+      const scale = 1 / Math.sqrt(es)
       for (let n = 0; n < numSamples; n++) {
         const symbol = pseudoRandomSymbol(Math.floor(n / samplesPerSymbol), order)
         const i = ((symbol % sqrtOrder) - (sqrtOrder - 1) / 2) / ((sqrtOrder - 1) / 2)
         const q = (Math.floor(symbol / sqrtOrder) - (sqrtOrder - 1) / 2) / ((sqrtOrder - 1) / 2)
-        samples[n] = amplitude * (i * Math.cos(wc * n) - q * Math.sin(wc * n))
+        samples[n] = amplitude * scale * (i * Math.cos(wc * n) - q * Math.sin(wc * n))
       }
       break
     }

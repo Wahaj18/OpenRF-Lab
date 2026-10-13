@@ -5,7 +5,7 @@ describe('antenna patterns', () => {
   it('dipole has peak at broadside', () => {
     const result = computeDipolePattern();
     const peakIdx = result.pattern.indexOf(Math.max(...Array.from(result.pattern)));
-    expect(result.angles[peakIdx]).toBeCloseTo(90, 0); // peak at 90°
+    expect(Math.abs(result.angles[peakIdx])).toBeCloseTo(90, 0); // peak at ±90°
   });
 
   it('array pattern has correct number of points', () => {

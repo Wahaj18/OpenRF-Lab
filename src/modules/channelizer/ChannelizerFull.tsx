@@ -131,10 +131,10 @@ function SpectrumPlot({
 }
 
 function formatFlops(flops: number): string {
-  if (flops >= 1e9) return `${(flops / 1e9).toFixed(1)} GFLOPS`
-  if (flops >= 1e6) return `${(flops / 1e6).toFixed(1)} MFLOPS`
-  if (flops >= 1e3) return `${(flops / 1e3).toFixed(1)} KFLOPS`
-  return `${flops.toFixed(0)} FLOPS`
+  if (flops >= 1e9) return `${(flops / 1e9).toFixed(1)}G mults`
+  if (flops >= 1e6) return `${(flops / 1e6).toFixed(1)}M mults`
+  if (flops >= 1e3) return `${(flops / 1e3).toFixed(1)}k mults`
+  return `${flops.toFixed(0)} mults`
 }
 
 export function ChannelizerFull() {

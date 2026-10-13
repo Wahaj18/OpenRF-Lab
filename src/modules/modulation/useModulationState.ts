@@ -30,7 +30,7 @@ export interface ModulationState {
 
 const SQRT2_INV = 1 / Math.sqrt(2)
 
-function getIdealConstellation(type: ModulationType): IQPoint[] {
+export function getIdealConstellation(type: ModulationType): IQPoint[] {
   switch (type) {
     case 'bpsk':
       return [{ i: -1, q: 0 }, { i: 1, q: 0 }]
@@ -57,18 +57,21 @@ function getIdealConstellation(type: ModulationType): IQPoint[] {
   }
 }
 
+/** Square QAM grid scaled to unit average symbol energy (Es = 1), so SNR means Es/N0. */
 function buildQamGrid(side: number): IQPoint[] {
   const points: IQPoint[] = []
   const half = (side - 1) / 2
+  // Mean of (col - half)^2 over the grid is (side^2 - 1)/12 per axis
+  const scale = 1 / Math.sqrt((2 * (side * side - 1)) / 12)
   for (let row = 0; row < side; row++) {
     for (let col = 0; col < side; col++) {
-      points.push({ i: (col - half) / half, q: (row - half) / half })
+      points.push({ i: (col - half) * scale, q: (row - half) * scale })
     }
   }
   return points
 }
 
-function getBitsPerSymbol(type: ModulationType): number {
+export function getBitsPerSymbol(type: ModulationType): number {
   switch (type) {
     case 'bpsk': return 1
     case 'qpsk': return 2
@@ -87,7 +90,7 @@ function gaussianRandom(): number {
   return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v)
 }
 
-function generateNoisyConstellation(
+export function generateNoisyConstellation(
   ideal: IQPoint[],
   numSymbols: number,
   snrDb: number,
@@ -105,7 +108,7 @@ function generateNoisyConstellation(
   return points
 }
 
-function generateAnalogSignal(
+export function generateAnalogSignal(
   type: 'am' | 'fm',
   carrierFreq: number,
   modulationIndex: number,
@@ -124,10 +127,10 @@ function generateAnalogSignal(
     if (type === 'am') {
       signal[n] = (1 + modulationIndex * msg) * Math.cos(2 * Math.PI * carrierFreq * t)
     } else {
-      const integral = -Math.cos(2 * Math.PI * messageFreq * t) / (2 * Math.PI * messageFreq)
-      signal[n] = Math.cos(2 * Math.PI * carrierFreq * t + modulationIndex * integral)
+      // Tone FM: the modulation index is the peak phase deviation (beta = Δf / fm)
+      signal[n] = Math.cos(2 * Math.PI * carrierFreq * t + modulationIndex * msg)
     }
-    signal[n] += gaussianRandom() * noiseSigma
+    if (noiseSigma > 0) signal[n] += gaussianRandom() * noiseSigma
   }
   return signal
 }

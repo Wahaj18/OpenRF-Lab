@@ -1,4 +1,4 @@
-import { fft, magnitudeSpectrum } from './fft'
+import { fft } from './fft'
 import { createWindow } from './windowing'
 import { applyDetector } from './detection'
 import { generateCW } from './signals/cw'
@@ -19,18 +19,34 @@ const MAX_FFT = 1 << 16
  */
 const GUARD = 0.1
 
-export interface SweepPlan { fftSize: number; sampleRate: number; ifOrigin: number; firstBin: number; lastBin: number }
+export interface SweepPlan { fftSize: number; sampleRate: number; ifOrigin: number; firstBin: number; lastBin: number; binHz: number; rbw: number }
+
+/** FFT bins per RBW: keeps the RBW filter much wider than the window's main lobe so a CW reads its full power. */
+const BINS_PER_RBW = 8
+
+/**
+ * Gaussian RBW filter, -3 dB at ±RBW/2. Its equivalent noise bandwidth is
+ * RBW·sqrt(pi / (4 ln 2)) ≈ 1.0645·RBW, so noise reads 10·log10(1.0645·RBW·N0).
+ */
+export const RBW_ENBW_FACTOR = Math.sqrt(Math.PI / (4 * Math.LN2))
+
+/** The RBW the engine actually applies for this span (narrow RBWs are limited by the FFT size cap). */
+export function effectiveRbw(span: number, rbw: number): number {
+  return planSweep({ span, rbw, centerFreq: span } as AnalyzerConfig).rbw
+}
 
 export function planSweep(config: AnalyzerConfig): SweepPlan {
   const sampleRate = config.span * 2.5
-  const wanted = Math.max(256, 2 * (config.fftSize || 1024))
+  const wanted = Math.max(256, (BINS_PER_RBW * sampleRate) / Math.max(config.rbw, 1e-9))
   const fftSize = Math.min(MAX_FFT, Math.pow(2, Math.ceil(Math.log2(wanted))))
   const binHz = sampleRate / fftSize
   const startFreq = config.centerFreq - config.span / 2
   const ifOrigin = startFreq - GUARD * config.span
   const firstBin = Math.round((GUARD * config.span) / binHz)
   const lastBin = Math.round(((GUARD + 1) * config.span) / binHz)
-  return { fftSize, sampleRate, ifOrigin, firstBin, lastBin }
+  // The FFT size is capped, so very narrow RBWs are limited to BINS_PER_RBW bins.
+  const rbw = Math.max(config.rbw, BINS_PER_RBW * binHz)
+  return { fftSize, sampleRate, ifOrigin, firstBin, lastBin, binHz, rbw }
 }
 
 /** One detected sweep across the analyzer span, DISPLAY_BINS points in dBm. */
@@ -45,18 +61,34 @@ export function computeSweep(config: AnalyzerConfig, signals: SignalConfig[], fh
   }
   const window = createWindow(config.windowType, N)
   const windowed = new Float64Array(N)
-  for (let i = 0; i < N; i++) windowed[i] = composite[i] * window[i]
+  let w2 = 0
+  for (let i = 0; i < N; i++) { windowed[i] = composite[i] * window[i]; w2 += window[i] * window[i] }
   const freq = fft(windowed, new Float64Array(N))
-  const mag = magnitudeSpectrum(freq.real, freq.imag, N)
-  // Calibrate so a CW reads its RMS power in dBm: undo the window's coherent
-  // gain and fold the negative-frequency half into the one-sided spectrum.
-  let wSum = 0
-  for (let i = 0; i < N; i++) wSum += window[i]
-  const cg = wSum / N
-  const calDb = 10 * Math.log10(2 / (cg * cg))
-  const inSpan = mag.slice(plan.firstBin, plan.lastBin + 1)
-  for (let i = 0; i < inSpan.length; i++) if (inSpan[i] > -150) inSpan[i] += calDb
+  // One-sided power per bin, normalised so the bins of any signal sum to its
+  // power (Parseval). A CW then reads its power once the RBW filter is applied
+  // and noise reads its density times the filter's noise bandwidth.
+  const half = N / 2
+  const binPower = new Float64Array(half + 1)
+  const norm = 2 / (N * w2)
+  for (let k = 0; k <= half; k++) binPower[k] = (freq.real[k] * freq.real[k] + freq.imag[k] * freq.imag[k]) * norm
+  const inSpan = applyRbwFilter(binPower, plan.firstBin, plan.lastBin, plan.rbw / plan.binHz)
   return applyVbwSmoothing(applyDetector(inSpan, DISPLAY_BINS, config.detectorType), config.vbw, config.rbw)
+}
+
+/** Convolve the bin powers with a Gaussian RBW filter of rbwBins (-3 dB width, in bins); returns dBm for bins first..last. */
+export function applyRbwFilter(binPower: Float64Array, first: number, last: number, rbwBins: number): Float64Array {
+  const reach = Math.ceil(2 * rbwBins)
+  const kernel = new Float64Array(2 * reach + 1)
+  for (let j = -reach; j <= reach; j++) kernel[j + reach] = Math.pow(2, -Math.pow((2 * j) / rbwBins, 2))
+  const out = new Float64Array(last - first + 1)
+  const maxBin = binPower.length - 1
+  for (let k = first; k <= last; k++) {
+    let acc = 0
+    const lo = Math.max(0, k - reach), hi = Math.min(maxBin, k + reach)
+    for (let j = lo; j <= hi; j++) acc += binPower[j] * kernel[j - k + reach]
+    out[k - first] = acc > 1e-15 ? 10 * Math.log10(acc) : -150
+  }
+  return out
 }
 
 export function generateSignal(sig: SignalConfig, sampleRate: number, numSamples: number, centerFreq: number, fhssStates: Map<string, FHSSState>): Float64Array {

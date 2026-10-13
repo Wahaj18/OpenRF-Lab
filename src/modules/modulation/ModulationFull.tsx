@@ -42,7 +42,7 @@ const EDUCATION_INFO: Record<ModulationType, { title: string; description: strin
   },
   '64qam': {
     title: '64-QAM',
-    description: '64-QAM maps 6 bits per symbol on an 8x8 grid. High spectral efficiency (6 bits/Hz/s) but requires SNR above ~26 dB. Used in LTE, Wi-Fi, and digital cable TV.',
+    description: '64-QAM maps 6 bits per symbol on an 8x8 grid. High spectral efficiency (6 bit/s/Hz) but requires SNR above ~26 dB. Used in LTE, Wi-Fi, and digital cable TV.',
   },
   '256qam': {
     title: '256-QAM',

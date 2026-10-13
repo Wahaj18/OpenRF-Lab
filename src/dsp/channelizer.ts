@@ -16,11 +16,12 @@ export interface ChannelizerConfig {
 }
 
 export interface ChannelizerResult {
-  channelOutputs: Float64Array[]  // M arrays of channel magnitudes (dB)
+  channelOutputs: Float64Array[]  // M arrays: spectrum (dB) of each channel's baseband output, centred on the channel
+  channelPowerDb: number[]        // mean output power of each channel (dB)
   prototypeResponse: Float64Array // prototype filter frequency response
   channelFrequencies: number[]    // center frequency of each channel
-  complexityPolyphase: number     // FLOPS for polyphase
-  complexityBruteForce: number    // FLOPS for brute-force
+  complexityPolyphase: number     // multiplies for polyphase: N·(L/M + log2 M)
+  complexityBruteForce: number    // multiplies for brute force: N·M·L
 }
 
 /**
@@ -47,19 +48,16 @@ function designPrototypeFilter(order: number, numChannels: number): Float64Array
 }
 
 /**
- * Compute the frequency response of a filter (magnitude in dB).
+ * Compute the frequency response of a filter (magnitude in dB), nfft/2 points from 0 to fs/2.
  */
 function filterFrequencyResponse(h: Float64Array, nfft: number): Float64Array {
   const real = new Float64Array(nfft)
-  const imag = new Float64Array(nfft)
   real.set(h)
-
-  fft(real, imag)
-
+  const spec = fft(real, new Float64Array(nfft))
   const halfN = nfft >> 1
   const response = new Float64Array(halfN)
   for (let i = 0; i < halfN; i++) {
-    const mag = Math.sqrt(real[i] * real[i] + imag[i] * imag[i])
+    const mag = Math.hypot(spec.real[i], spec.imag[i])
     response[i] = 20 * Math.log10(Math.max(mag, 1e-12))
   }
   return response
@@ -101,63 +99,51 @@ export function channelize(input: Float64Array, config: ChannelizerConfig): Chan
     branches.push(branch)
   }
 
-  // Process input in blocks of M samples
-  // Pad input to a multiple of M
-  const inputPadLen = Math.ceil(input.length / M) * M
-  const paddedInput = new Float64Array(inputPadLen)
-  paddedInput.set(input)
-
-  const numBlocks = inputPadLen / M
-  // Each channel accumulates output blocks; gather magnitude per channel
-  const channelAccum: Float64Array[] = []
-  for (let ch = 0; ch < M; ch++) {
-    channelAccum.push(new Float64Array(numBlocks))
-  }
-
-  // For each block, apply polyphase filter + M-point FFT
-  for (let b = 0; b < numBlocks; b++) {
-    const fftReal = new Float64Array(M)
-    const fftImag = new Float64Array(M)
-
+  // Analysis filter bank. Channel c (centred on c·fs/M) at output m is
+  //   y_c[m] = sum_n h[n]·x[mM − n]·e^{+j2πcn/M}
+  // which is a mix-down, lowpass and decimate-by-M. Splitting n = pM + k:
+  //   v_k[m] = sum_p h_k[p]·x[(m − p)M − k],  y_c[m] = sum_k v_k[m]·e^{+j2πck/M}
+  // so each block costs M short branch filters and one M-point FFT.
+  const numBlocks = Math.ceil(input.length / M)
+  const outRe: Float64Array[] = [], outIm: Float64Array[] = []
+  for (let ch = 0; ch < M; ch++) { outRe.push(new Float64Array(numBlocks)); outIm.push(new Float64Array(numBlocks)) }
+  const v = new Float64Array(M)
+  for (let m = 0; m < numBlocks; m++) {
     for (let k = 0; k < M; k++) {
-      // Polyphase filtering: convolve branch k with decimated input
       let sum = 0
-      for (let n = 0; n < branchLen; n++) {
-        const inputIdx = b * M + k - n * M
-        if (inputIdx >= 0 && inputIdx < inputPadLen) {
-          sum += branches[k][n] * paddedInput[inputIdx]
-        }
+      for (let p = 0; p < branchLen; p++) {
+        const idx = (m - p) * M - k
+        if (idx >= 0 && idx < input.length) sum += branches[k][p] * input[idx]
       }
-      fftReal[k] = sum
+      v[k] = sum
     }
-
-    // M-point FFT across branches
-    fft(fftReal, fftImag)
-
-    // Store magnitude for each channel
+    // The forward FFT uses e^{-j}; channel c is FFT bin (M − c) mod M.
+    const spec = fft(v, new Float64Array(M))
     for (let ch = 0; ch < M; ch++) {
-      channelAccum[ch][b] = Math.sqrt(
-        fftReal[ch] * fftReal[ch] + fftImag[ch] * fftImag[ch]
-      )
+      const bin = (M - ch) % M
+      outRe[ch][m] = spec.real[bin]
+      outIm[ch][m] = spec.imag[bin]
     }
   }
 
-  // Convert channel outputs to dB magnitude spectrum
-  const channelOutputs: Float64Array[] = channelAccum.map(acc => {
-    const nfft = nextPow2(acc.length)
-    const real = new Float64Array(nfft)
-    const imag = new Float64Array(nfft)
-    real.set(acc)
-    fft(real, imag)
-
-    const halfN = Math.max(nfft >> 1, 1)
-    const spectrum = new Float64Array(halfN)
-    for (let i = 0; i < halfN; i++) {
-      const mag = Math.sqrt(real[i] * real[i] + imag[i] * imag[i]) / nfft
-      spectrum[i] = 20 * Math.log10(Math.max(mag, 1e-12))
+  const channelPowerDb: number[] = []
+  const channelOutputs: Float64Array[] = []
+  for (let ch = 0; ch < M; ch++) {
+    let pw = 0
+    for (let m = 0; m < numBlocks; m++) pw += outRe[ch][m] ** 2 + outIm[ch][m] ** 2
+    channelPowerDb.push(10 * Math.log10(Math.max(pw / numBlocks, 1e-24)))
+    // Spectrum of the complex channel output, shifted so the channel centre is in the middle
+    const nfft = nextPow2(numBlocks)
+    const re = new Float64Array(nfft), im = new Float64Array(nfft)
+    re.set(outRe[ch]); im.set(outIm[ch])
+    const spec = fft(re, im)
+    const out = new Float64Array(nfft)
+    for (let i = 0; i < nfft; i++) {
+      const src = (i + nfft / 2) % nfft
+      out[i] = 20 * Math.log10(Math.max(Math.hypot(spec.real[src], spec.imag[src]) / numBlocks, 1e-12))
     }
-    return spectrum
-  })
+    channelOutputs.push(out)
+  }
 
   // Prototype filter frequency response
   const protoNfft = nextPow2(Math.max(prototypeOrder, 256))
@@ -177,6 +163,7 @@ export function channelize(input: Float64Array, config: ChannelizerConfig): Chan
 
   return {
     channelOutputs,
+    channelPowerDb,
     prototypeResponse,
     channelFrequencies,
     complexityPolyphase,

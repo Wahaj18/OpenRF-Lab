@@ -61,7 +61,7 @@ export function EIRPCalc() {
                 <span className="w-36" style={{ color: 'var(--sf-text-muted)' }}>{limit.band}</span>
                 <div className="flex-1 h-3 rounded overflow-hidden" style={{ backgroundColor: 'var(--sf-bg-control)' }}>
                   <div className="h-full rounded" style={{
-                    width: `${Math.min(100, (result / limit.eirpDbm) * 100)}%`,
+                    width: `${Math.min(100, Math.pow(10, (result - limit.eirpDbm) / 10) * 100)}%`,
                     backgroundColor: exceeds ? 'var(--sf-marker-red)' : 'var(--sf-accent-green)',
                     opacity: 0.7,
                   }} />

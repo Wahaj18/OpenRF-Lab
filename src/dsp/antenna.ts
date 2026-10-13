@@ -55,285 +55,216 @@ function normalizePatternDb(patternLinear: Float64Array): Float64Array {
   return patternDb;
 }
 
-function computeBeamwidth(patternDb: Float64Array, angles: Float64Array): number {
-  // Find peak index
-  let peakIdx = 0;
-  let peakVal = patternDb[0];
-  for (let i = 1; i < patternDb.length; i++) {
-    if (patternDb[i] > peakVal) {
-      peakVal = patternDb[i];
-      peakIdx = i;
-    }
-  }
-
-  const threshold = peakVal - 3;
-
-  // Search left from peak
-  let leftAngle = angles[0];
-  for (let i = peakIdx; i >= 0; i--) {
-    if (patternDb[i] < threshold) {
-      // Interpolate
-      if (i + 1 < patternDb.length) {
-        const frac =
-          (threshold - patternDb[i]) / (patternDb[i + 1] - patternDb[i]);
-        leftAngle = angles[i] + frac * (angles[i + 1] - angles[i]);
-      } else {
-        leftAngle = angles[i];
-      }
-      break;
-    }
-  }
-
-  // Search right from peak
-  let rightAngle = angles[angles.length - 1];
-  for (let i = peakIdx; i < patternDb.length; i++) {
-    if (patternDb[i] < threshold) {
-      if (i - 1 >= 0) {
-        const frac =
-          (threshold - patternDb[i]) / (patternDb[i - 1] - patternDb[i]);
-        rightAngle = angles[i] + frac * (angles[i - 1] - angles[i]);
-      } else {
-        rightAngle = angles[i];
-      }
-      break;
-    }
-  }
-
-  return Math.abs(rightAngle - leftAngle);
+/** Index of the strongest point (first one on ties) within [lo, hi]. */
+function peakIndex(patternDb: Float64Array, lo = 0, hi = patternDb.length - 1): number {
+  let idx = lo;
+  for (let i = lo + 1; i <= hi; i++) if (patternDb[i] > patternDb[idx]) idx = i;
+  return idx;
 }
 
-function computePeakSidelobe(
-  patternDb: Float64Array,
-  angles: Float64Array,
-  beamwidthDeg: number,
-  isOmnidirectional: boolean = false,
-): number {
-  let peakIdx = 0;
-  let peakVal = patternDb[0];
-  for (let i = 1; i < patternDb.length; i++) {
-    if (patternDb[i] > peakVal) {
-      peakVal = patternDb[i];
-      peakIdx = i;
+/** -3 dB beamwidth of the main lobe, interpolating between angle samples. */
+function computeBeamwidth(patternDb: Float64Array, angles: Float64Array, lo: number, hi: number): number {
+  const peakIdx = peakIndex(patternDb, lo, hi);
+  const threshold = patternDb[peakIdx] - 3;
+  let left = angles[lo];
+  for (let i = peakIdx; i > lo; i--) {
+    if (patternDb[i - 1] < threshold) {
+      left = angles[i] - ((patternDb[i] - threshold) / (patternDb[i] - patternDb[i - 1])) * (angles[i] - angles[i - 1]);
+      break;
     }
   }
-
-  const peakAngle = angles[peakIdx];
-  const halfBw = beamwidthDeg / 2;
-  const exclusionRadius = halfBw * 1.5;
-  let maxSidelobe = MIN_DB;
-
-  for (let i = 0; i < patternDb.length; i++) {
-    const angleDiff = Math.abs(angles[i] - peakAngle);
-    // Exclude the primary main lobe region
-    if (angleDiff <= exclusionRadius) continue;
-    // For omnidirectional/bidirectional patterns, also exclude the opposite main lobe
-    if (isOmnidirectional) {
-      const oppositeAngle = peakAngle > 0 ? peakAngle - 180 : peakAngle + 180;
-      if (Math.abs(angles[i] - oppositeAngle) <= exclusionRadius) continue;
-    }
-    if (patternDb[i] > maxSidelobe) {
-      maxSidelobe = patternDb[i];
+  let right = angles[hi];
+  for (let i = peakIdx; i < hi; i++) {
+    if (patternDb[i + 1] < threshold) {
+      right = angles[i] + ((patternDb[i] - threshold) / (patternDb[i] - patternDb[i + 1])) * (angles[i + 1] - angles[i]);
+      break;
     }
   }
-
-  return maxSidelobe;
+  return right - left;
 }
 
 /**
- * Estimate directivity from a 2D pattern cut using the Kraus approximation:
- * D ≈ 41253 / (BW_az × BW_el), where both beamwidths are in degrees.
- * For a single-cut pattern, we assume a symmetric beam (BW_el = BW_az)
- * unless the pattern is omnidirectional in one plane.
+ * Peak sidelobe relative to the main beam: the highest point outside the main
+ * lobe, whose edges are the first nulls (local minima) either side of the peak.
+ * Points listed in `exclude` (e.g. a dipole's second, identical lobe) are skipped.
  */
-function computeDirectivityFromBeamwidth(beamwidthDeg: number, isOmnidirectional: boolean): number {
-  if (beamwidthDeg <= 0) return 0;
-  if (isOmnidirectional) {
-    // Omnidirectional in one plane: D ≈ 101 / BW_el (Pozar approx for omni patterns)
-    const directivityLinear = 101 / beamwidthDeg;
-    return Math.max(linearToDb(directivityLinear), 0);
+function computePeakSidelobe(patternDb: Float64Array, lo: number, hi: number, exclude: (i: number) => boolean = () => false): number {
+  const peakIdx = peakIndex(patternDb, lo, hi);
+  let l = peakIdx;
+  while (l > lo && patternDb[l - 1] <= patternDb[l]) l--;
+  let r = peakIdx;
+  while (r < hi && patternDb[r + 1] <= patternDb[r]) r++;
+  let maxSidelobe = MIN_DB;
+  for (let i = lo; i <= hi; i++) {
+    if ((i >= l && i <= r) || exclude(i)) continue;
+    if (patternDb[i] > maxSidelobe) maxSidelobe = patternDb[i];
   }
-  // Pencil beam: Kraus approximation D ≈ 41253 / (BW1 × BW2)
-  const directivityLinear = 41253 / (beamwidthDeg * beamwidthDeg);
-  return Math.max(linearToDb(directivityLinear), 0);
+  return maxSidelobe - patternDb[peakIdx];
+}
+
+/**
+ * Directivity in dBi by integrating the power pattern over the sphere, for a
+ * pattern that is rotationally symmetric about an axis. `axisAngle(theta)`
+ * maps a plotted angle to the polar angle from that axis (0..pi); only plotted
+ * angles in [0°, 180°] are used, so each direction is counted once.
+ *   D = 2 / ∫0^π |F(ψ)|² sin ψ dψ   (F normalised to 1 at the peak)
+ */
+function integrateDirectivity(field: (psi: number) => number): number {
+  const steps = 20000;
+  let maxF = 0;
+  const f2 = new Float64Array(steps + 1);
+  for (let i = 0; i <= steps; i++) {
+    const v = field((Math.PI * i) / steps);
+    f2[i] = v * v;
+    if (f2[i] > maxF) maxF = f2[i];
+  }
+  let integral = 0;
+  for (let i = 0; i <= steps; i++) {
+    const w = i === 0 || i === steps ? 0.5 : 1;
+    integral += w * f2[i] * Math.sin((Math.PI * i) / steps);
+  }
+  integral *= Math.PI / steps;
+  return 10 * Math.log10(2 / (integral / maxF));
 }
 
 function buildResult(
   patternLinear: Float64Array,
   angles: Float64Array,
-  isOmnidirectional: boolean = false,
+  directivity: number,
+  opts: { lo?: number; hi?: number; exclude?: (i: number) => boolean } = {},
 ): AntennaResult {
   const patternDb = normalizePatternDb(patternLinear);
-  const beamwidthDeg = computeBeamwidth(patternDb, angles);
-  const sll = computePeakSidelobe(patternDb, angles, beamwidthDeg, isOmnidirectional);
-  const directivity = computeDirectivityFromBeamwidth(beamwidthDeg, isOmnidirectional);
+  const lo = opts.lo ?? 0, hi = opts.hi ?? patternDb.length - 1;
+  const beamwidthDeg = computeBeamwidth(patternDb, angles, lo, hi);
+  const sll = computePeakSidelobe(patternDb, lo, hi, opts.exclude);
+  return { pattern: patternDb, angles, beamwidthDeg, sidelobeLevel: sll, directivity, gain: directivity };
+}
 
-  return {
-    pattern: patternDb,
-    angles,
-    beamwidthDeg,
-    sidelobeLevel: sll,
-    directivity,
-    gain: directivity, // lossless assumption
-  };
+/** Half-wave dipole along the 0° axis: F(θ) = cos(π/2·cos θ) / sin θ. HPBW 78°, D = 1.64 (2.15 dBi). */
+function halfWaveDipole(theta: number): number {
+  const s = Math.sin(theta);
+  if (Math.abs(s) < 1e-9) return 0;
+  return Math.abs(Math.cos((Math.PI / 2) * Math.cos(theta)) / s);
 }
 
 export function computeDipolePattern(): AntennaResult {
   const angles = createAngles();
   const pattern = new Float64Array(NUM_POINTS);
+  for (let i = 0; i < NUM_POINTS; i++) pattern[i] = halfWaveDipole(degToRad(angles[i]));
+  // Metrics on the 0..180° half; the other half is the mirror image.
+  const lo = 180, hi = 360;
+  return buildResult(pattern, angles, integrateDirectivity(halfWaveDipole), { lo, hi });
+}
 
-  for (let i = 0; i < NUM_POINTS; i++) {
-    const thetaRad = degToRad(angles[i]);
-    // Dipole: sin²(θ) envelope — peak at broadside (90°), nulls at endfire (0°, ±180°)
-    // Uses sin² to give a smooth single-peak pattern centered at +90°
-    const sinVal = Math.sin(thetaRad);
-    // Weight toward front hemisphere to model a realistic forward-looking dipole
-    const frontWeight = 1 + 0.001 * Math.sin(thetaRad);
-    pattern[i] = Math.abs(sinVal) * frontWeight;
-  }
-
-  return buildResult(pattern, angles, true); // dipole is omnidirectional in azimuth
+/** Patch modelled as cos θ over the front hemisphere, symmetric about boresight. */
+function patchField(theta: number): number {
+  return Math.abs(theta) <= Math.PI / 2 ? Math.cos(theta) : 0;
 }
 
 export function computePatchPattern(): AntennaResult {
   const angles = createAngles();
   const pattern = new Float64Array(NUM_POINTS);
-
-  for (let i = 0; i < NUM_POINTS; i++) {
-    const thetaRad = degToRad(angles[i]);
-    // Patch: cos(θ) in front hemisphere, zero in back
-    if (Math.abs(angles[i]) <= 90) {
-      pattern[i] = Math.cos(thetaRad);
-    } else {
-      pattern[i] = 0;
-    }
-  }
-
-  return buildResult(pattern, angles);
+  for (let i = 0; i < NUM_POINTS; i++) pattern[i] = patchField(degToRad(angles[i]));
+  return buildResult(pattern, angles, integrateDirectivity(patchField));
 }
 
+/** Gaussian beam, -3 dB (power) at ±beamwidth/2: F(θ) = exp(−ln2/2·(2θ/BW)²). */
 export function computeHornPattern(beamwidthDeg: number = 20): AntennaResult {
   const angles = createAngles();
   const pattern = new Float64Array(NUM_POINTS);
-  const theta3dB = beamwidthDeg / 2;
-
-  for (let i = 0; i < NUM_POINTS; i++) {
-    const theta = angles[i];
-    // Gaussian-like pattern
-    pattern[i] = Math.exp(-2.77 * (theta / theta3dB) ** 2);
-  }
-
-  return buildResult(pattern, angles);
+  const bw = degToRad(beamwidthDeg);
+  const field = (theta: number) => Math.exp(-(Math.LN2 / 2) * ((2 * theta) / bw) ** 2);
+  for (let i = 0; i < NUM_POINTS; i++) pattern[i] = field(degToRad(angles[i]));
+  return buildResult(pattern, angles, integrateDirectivity(field));
 }
 
-function computeTaylorWeights(n: number, sllDb: number): Float64Array {
-  // Simplified Taylor window approximation
-  // Uses a cosine-weighted approach scaled by desired SLL
+/** Taylor (n̄ = 4) amplitude taper, same definition as scipy.signal.windows.taylor. */
+export function computeTaylorWeights(n: number, sllDb: number, nbar = 4): Float64Array {
+  const B = Math.pow(10, Math.abs(sllDb) / 20);
+  const A = Math.acosh(B) / Math.PI;
+  const s2 = (nbar * nbar) / (A * A + (nbar - 0.5) ** 2);
+  const Fm: number[] = [];
+  for (let m = 1; m < nbar; m++) {
+    let numer = m % 2 === 1 ? 1 : -1;
+    for (let k = 1; k < nbar; k++) numer *= 1 - (m * m) / s2 / (A * A + (k - 0.5) ** 2);
+    let denom = 2;
+    for (let k = 1; k < nbar; k++) if (k !== m) denom *= 1 - (m * m) / (k * k);
+    Fm.push(numer / denom);
+  }
+  const W = (x: number) => {
+    let w = 1;
+    for (let m = 1; m < nbar; m++) w += 2 * Fm[m - 1] * Math.cos((2 * Math.PI * m * (x - n / 2 + 0.5)) / n);
+    return w;
+  };
+  const scale = 1 / W((n - 1) / 2);
   const weights = new Float64Array(n);
-  const nbar = Math.max(
-    2,
-    Math.round(2 * Math.pow(10, -sllDb / 20)) // rough approximation
-  );
-  const a = Math.acosh(Math.pow(10, -sllDb / 20)) / Math.PI;
-
-  for (let i = 0; i < n; i++) {
-    let w = 1.0;
-    for (let m = 1; m < nbar; m++) {
-      w += 0.5 * Math.cos((2 * Math.PI * m * (i - (n - 1) / 2)) / n) *
-        Math.exp(-((m * m) / (a * a * 2)));
-    }
-    weights[i] = Math.max(w, 0.001);
-  }
-
-  // Normalize
-  let maxW = 0;
-  for (let i = 0; i < n; i++) {
-    if (weights[i] > maxW) maxW = weights[i];
-  }
-  for (let i = 0; i < n; i++) {
-    weights[i] /= maxW;
-  }
-
+  for (let i = 0; i < n; i++) weights[i] = W(i) * scale;
   return weights;
 }
 
-function computeChebyshevWeights(n: number, sllDb: number): Float64Array {
-  // Dolph-Chebyshev weights via inverse DFT of Chebyshev polynomial
-  const R = Math.pow(10, -sllDb / 20);
-  const x0 = Math.cosh(Math.acosh(R) / (n - 1));
-  const weights = new Float64Array(n);
-
+/** Dolph-Chebyshev taper with every sidelobe at sllDb, same definition as scipy.signal.windows.chebwin. */
+export function computeChebyshevWeights(n: number, sllDb: number): Float64Array {
+  if (n < 2) return new Float64Array(n).fill(1);
+  const order = n - 1;
+  const beta = Math.cosh(Math.acosh(Math.pow(10, Math.abs(sllDb) / 20)) / order);
+  const pRe = new Float64Array(n), pIm = new Float64Array(n);
+  for (let k = 0; k < n; k++) {
+    const x = beta * Math.cos((Math.PI * k) / n);
+    let t: number;
+    if (x > 1) t = Math.cosh(order * Math.acosh(x));
+    else if (x < -1) t = (2 * (n % 2) - 1) * Math.cosh(order * Math.acosh(-x));
+    else t = Math.cos(order * Math.acos(x));
+    if (n % 2 === 1) { pRe[k] = t; }
+    else { pRe[k] = t * Math.cos((Math.PI * k) / n); pIm[k] = t * Math.sin((Math.PI * k) / n); }
+  }
+  // Real part of the DFT
+  const dft = new Float64Array(n);
   for (let i = 0; i < n; i++) {
-    let sum = 0;
+    let acc = 0;
     for (let k = 0; k < n; k++) {
-      const angle = (Math.PI * k) / n;
-      const arg = x0 * Math.cos(angle);
-      // Chebyshev polynomial T_{n-1}(arg)
-      let cheb: number;
-      if (Math.abs(arg) <= 1) {
-        cheb = Math.cos((n - 1) * Math.acos(arg));
-      } else {
-        cheb = Math.cosh((n - 1) * Math.acosh(Math.abs(arg)));
-        if (arg < 0 && (n - 1) % 2 === 1) cheb = -cheb;
-      }
-      sum += cheb * Math.cos((2 * Math.PI * k * (i - (n - 1) / 2)) / n);
+      const a = (-2 * Math.PI * i * k) / n;
+      acc += pRe[k] * Math.cos(a) - pIm[k] * Math.sin(a);
     }
-    weights[i] = Math.abs(sum);
+    dft[i] = acc;
   }
-
-  // Normalize
+  const w = new Float64Array(n);
+  if (n % 2 === 1) {
+    const h = (n + 1) / 2;
+    for (let i = 0; i < h; i++) { w[h - 1 - i] = dft[i]; w[h - 1 + i] = dft[i]; }
+  } else {
+    const h = n / 2 + 1;
+    for (let i = 1; i < h; i++) { w[h - 1 - i] = dft[i]; w[h - 2 + i] = dft[i]; }
+  }
   let maxW = 0;
-  for (let i = 0; i < n; i++) {
-    if (weights[i] > maxW) maxW = weights[i];
-  }
-  if (maxW > 0) {
-    for (let i = 0; i < n; i++) {
-      weights[i] /= maxW;
-    }
-  }
+  for (let i = 0; i < n; i++) maxW = Math.max(maxW, w[i]);
+  for (let i = 0; i < n; i++) w[i] /= maxW;
+  return w;
+}
 
-  return weights;
+/** Array factor magnitude of a uniform linear array of isotropic elements, θ from broadside. */
+function arrayFactor(weights: Float64Array, spacing: number, scanRad: number, thetaRad: number): number {
+  let re = 0, im = 0;
+  for (let n = 0; n < weights.length; n++) {
+    const phase = 2 * Math.PI * spacing * n * (Math.sin(thetaRad) - Math.sin(scanRad));
+    re += weights[n] * Math.cos(phase);
+    im += weights[n] * Math.sin(phase);
+  }
+  return Math.hypot(re, im);
 }
 
 export function computeArrayPattern(config: ArrayConfig): AntennaResult {
-  const { numElements, spacing, taperType, scanAngleDeg, sidelobeLevel } =
-    config;
+  const { numElements, spacing, taperType, scanAngleDeg, sidelobeLevel } = config;
   const angles = createAngles();
   const pattern = new Float64Array(NUM_POINTS);
-
-  // Compute taper weights
-  let weights: Float64Array;
-  switch (taperType) {
-    case 'taylor':
-      weights = computeTaylorWeights(numElements, sidelobeLevel);
-      break;
-    case 'chebyshev':
-      weights = computeChebyshevWeights(numElements, sidelobeLevel);
-      break;
-    default:
-      weights = new Float64Array(numElements).fill(1);
-  }
-
+  const weights =
+    taperType === 'taylor' ? computeTaylorWeights(numElements, sidelobeLevel) :
+    taperType === 'chebyshev' ? computeChebyshevWeights(numElements, sidelobeLevel) :
+    new Float64Array(numElements).fill(1);
   const scanRad = degToRad(scanAngleDeg);
-
-  for (let i = 0; i < NUM_POINTS; i++) {
-    const thetaRad = degToRad(angles[i]);
-    // Array factor: AF = Σ w_n * exp(j * n * 2π * d * (sin(θ) - sin(θ_scan)))
-    let realSum = 0;
-    let imagSum = 0;
-
-    for (let n = 0; n < numElements; n++) {
-      const phase =
-        2 *
-        Math.PI *
-        spacing *
-        n *
-        (Math.sin(thetaRad) - Math.sin(scanRad));
-      realSum += weights[n] * Math.cos(phase);
-      imagSum += weights[n] * Math.sin(phase);
-    }
-
-    pattern[i] = Math.sqrt(realSum * realSum + imagSum * imagSum);
-  }
-
-  return buildResult(pattern, angles);
+  for (let i = 0; i < NUM_POINTS; i++) pattern[i] = arrayFactor(weights, spacing, scanRad, degToRad(angles[i]));
+  // A linear array of isotropic elements is symmetric about its axis, so the
+  // pattern from -90° to 90° holds every direction once; the back half mirrors it.
+  // Directivity: ψ from the array axis, sin θ = cos ψ.
+  const D = integrateDirectivity(psi => arrayFactor(weights, spacing, scanRad, Math.PI / 2 - psi));
+  return buildResult(pattern, angles, D, { lo: 90, hi: 270 });
 }

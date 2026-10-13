@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { formatFrequency, formatAmplitude } from '../../utils/format'
 import type { Marker } from '../../hooks/useMarkers'
+import { computeBandPower, computeNdbBandwidth } from '../../dsp/markers'
 
 interface Props {
   markers: Marker[]
@@ -8,51 +9,10 @@ interface Props {
   spectrumData?: Map<number, Float32Array>
   startFreq?: number
   span?: number
+  rbw?: number
 }
 
-function computeNdbBandwidth(
-  spectrum: Float32Array, startFreq: number, span: number, peakFreq: number, nDb: number,
-): number | null {
-  if (spectrum.length === 0) return null
-  const binWidth = span / (spectrum.length - 1)
-  const peakBin = Math.round((peakFreq - startFreq) / binWidth)
-  if (peakBin < 0 || peakBin >= spectrum.length) return null
-  const threshold = spectrum[peakBin] - nDb
-
-  let leftFreq = startFreq
-  for (let i = peakBin; i >= 0; i--) {
-    if (spectrum[i] < threshold) {
-      leftFreq = startFreq + i * binWidth
-      break
-    }
-  }
-  let rightFreq = startFreq + span
-  for (let i = peakBin; i < spectrum.length; i++) {
-    if (spectrum[i] < threshold) {
-      rightFreq = startFreq + i * binWidth
-      break
-    }
-  }
-  return rightFreq - leftFreq
-}
-
-function computeBandPower(
-  spectrum: Float32Array, startFreq: number, span: number, centerFreq: number, bandwidthHz: number,
-): number | null {
-  if (spectrum.length === 0) return null
-  const binWidth = span / (spectrum.length - 1)
-  const lowBin = Math.max(0, Math.floor((centerFreq - bandwidthHz / 2 - startFreq) / binWidth))
-  const highBin = Math.min(spectrum.length - 1, Math.ceil((centerFreq + bandwidthHz / 2 - startFreq) / binWidth))
-  if (lowBin >= highBin) return null
-
-  let totalLinear = 0
-  for (let i = lowBin; i <= highBin; i++) {
-    totalLinear += Math.pow(10, spectrum[i] / 10)
-  }
-  return 10 * Math.log10(Math.max(totalLinear, 1e-15))
-}
-
-export function MarkerTable({ markers, onRemoveMarker, spectrumData, startFreq, span }: Props) {
+export function MarkerTable({ markers, onRemoveMarker, spectrumData, startFreq, span, rbw }: Props) {
   const [collapsed, setCollapsed] = useState(false)
   if (markers.length === 0) return null
 
@@ -85,14 +45,14 @@ export function MarkerTable({ markers, onRemoveMarker, spectrumData, startFreq, 
                   <td className="px-1.5 py-1">T{m.traceIndex + 1}</td>
                   <td className="px-1.5 py-1" style={{ color: 'var(--sf-accent-blue)' }}>{formatFrequency(m.frequency)}</td>
                   <td className="px-1.5 py-1" style={{ color: 'var(--sf-accent-blue)' }}>{formatAmplitude(m.amplitude)}</td>
-                  <td className="px-1.5 py-1" style={{ color: dF ? '#ff8c00' : 'var(--sf-text-dim)' }}>{dF ? formatFrequency(Math.abs(dF)) : '—'}</td>
-                  <td className="px-1.5 py-1" style={{ color: dA ? '#ff6b6b' : 'var(--sf-text-dim)' }}>{dA ? `${dA.toFixed(1)} dB` : '—'}</td>
+                  <td className="px-1.5 py-1" style={{ color: dF !== null ? '#ff8c00' : 'var(--sf-text-dim)' }}>{dF !== null ? `${dF < 0 ? '−' : '+'}${formatFrequency(Math.abs(dF))}` : '—'}</td>
+                  <td className="px-1.5 py-1" style={{ color: dA !== null ? '#ff6b6b' : 'var(--sf-text-dim)' }}>{dA !== null ? `${dA >= 0 ? '+' : ''}${dA.toFixed(1)} dB` : '—'}</td>
                   <td className="px-1.5 py-1" style={{ color: 'var(--sf-text-muted)' }}>
                     {m.type === 'delta' && m.refMarkerId ? `Ref: ${m.refMarkerId}` : ''}
                     {m.type === 'band-power' && m.bandwidthHz && spectrumData && startFreq !== undefined && span ? (() => {
                       const spectrum = spectrumData.get(m.traceIndex)
                       if (!spectrum) return `BW: ${formatFrequency(m.bandwidthHz)}`
-                      const power = computeBandPower(spectrum, startFreq, span, m.frequency, m.bandwidthHz)
+                      const power = computeBandPower(spectrum, startFreq, span, m.frequency, m.bandwidthHz, rbw ?? span / 100)
                       return `${formatAmplitude(power ?? -999)} over ${formatFrequency(m.bandwidthHz)}`
                     })() : m.type === 'band-power' && m.bandwidthHz ? `BW: ${formatFrequency(m.bandwidthHz)}` : ''}
                     {m.type === 'ndb-bw' && spectrumData && startFreq !== undefined && span ? (() => {

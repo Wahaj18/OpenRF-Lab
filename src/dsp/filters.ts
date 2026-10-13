@@ -21,71 +21,35 @@ export function designFIRFilter(
   windowType: WindowType,
   sampleRate: number,
 ): Float64Array {
-  const M = (order - 1) / 2
-  const window = createWindow(windowType, order)
-
-  switch (type) {
-    case 'lowpass':
-      return sincLowpass(cutoffLow, order, M, window, sampleRate)
-    case 'highpass':
-      return spectralInvert(sincLowpass(cutoffLow, order, M, window, sampleRate))
-    case 'bandpass': {
-      const lp1 = sincLowpass(cutoffHigh, order, M, window, sampleRate)
-      const lp2 = sincLowpass(cutoffLow, order, M, window, sampleRate)
-      const bp = new Float64Array(order)
-      for (let n = 0; n < order; n++) bp[n] = lp1[n] - lp2[n]
-      return bp
-    }
-    case 'bandstop': {
-      const lp = sincLowpass(cutoffLow, order, M, window, sampleRate)
-      const hp = spectralInvert(sincLowpass(cutoffHigh, order, M, window, sampleRate))
-      const bs = new Float64Array(order)
-      for (let n = 0; n < order; n++) bs[n] = lp[n] + hp[n]
-      return bs
-    }
+  // Highpass and bandstop need gain at Nyquist, which an even tap count cannot give.
+  const taps = (type === 'highpass' || type === 'bandstop') && order % 2 === 0 ? order + 1 : order
+  const nyq = sampleRate / 2
+  const lo = cutoffLow / nyq, hi = cutoffHigh / nyq
+  // Passbands as fractions of Nyquist, and where each design is scaled to unity gain
+  const bands: [number, number][] =
+    type === 'lowpass' ? [[0, lo]] :
+    type === 'highpass' ? [[lo, 1]] :
+    type === 'bandpass' ? [[lo, hi]] : [[0, lo], [hi, 1]]
+  const scaleAt = type === 'lowpass' || type === 'bandstop' ? 0 : type === 'highpass' ? 1 : (lo + hi) / 2
+  const window = createWindow(windowType, taps)
+  const M = (taps - 1) / 2
+  const h = new Float64Array(taps)
+  for (let n = 0; n < taps; n++) {
+    const m = n - M
+    let v = 0
+    for (const [l, r] of bands) v += r * sinc(r * m) - l * sinc(l * m)
+    h[n] = v * window[n]
   }
-}
-
-/** Windowed sinc lowpass filter */
-function sincLowpass(
-  cutoff: number,
-  order: number,
-  M: number,
-  window: Float64Array,
-  sampleRate: number,
-): Float64Array {
-  const fc = cutoff / sampleRate // normalized cutoff
-  const h = new Float64Array(order)
-
-  for (let n = 0; n < order; n++) {
-    const nm = n - M
-    if (Math.abs(nm) < 1e-12) {
-      h[n] = 2 * fc
-    } else {
-      h[n] = Math.sin(2 * Math.PI * fc * nm) / (Math.PI * nm)
-    }
-    h[n] *= window[n]
-  }
-
-  // Normalize for unity gain at DC
-  let sum = 0
-  for (let n = 0; n < order; n++) sum += h[n]
-  if (Math.abs(sum) > 1e-12) {
-    for (let n = 0; n < order; n++) h[n] /= sum
-  }
-
+  let s = 0
+  for (let n = 0; n < taps; n++) s += h[n] * Math.cos(Math.PI * (n - M) * scaleAt)
+  if (Math.abs(s) > 1e-12) for (let n = 0; n < taps; n++) h[n] /= s
   return h
 }
 
-/** Spectral inversion: converts lowpass to highpass */
-function spectralInvert(h: Float64Array): Float64Array {
-  const out = new Float64Array(h.length)
-  const M = (h.length - 1) / 2
-  for (let n = 0; n < h.length; n++) {
-    out[n] = -h[n]
-  }
-  out[Math.round(M)] += 1
-  return out
+function sinc(x: number): number {
+  if (Math.abs(x) < 1e-12) return 1
+  const px = Math.PI * x
+  return Math.sin(px) / px
 }
 
 export interface FrequencyResponse {
@@ -133,13 +97,8 @@ export function computeFrequencyResponse(
 }
 
 /**
- * Compute the group delay of an FIR filter.
- * Group delay = -d(phase)/d(omega), approximated via finite difference.
- *
- * @param coefficients - FIR filter coefficients
- * @param numPoints - Number of frequency points
- * @param sampleRate - Sample rate in Hz
- * @returns Float64Array of group delay in samples
+ * Group delay in samples: Re{ sum(n·h[n]·e^-jwn) / sum(h[n]·e^-jwn) }.
+ * At exact response zeros it is undefined; there the linear-phase value (N-1)/2 is used.
  */
 export function computeGroupDelay(
   coefficients: Float64Array,
@@ -148,33 +107,16 @@ export function computeGroupDelay(
 ): Float64Array {
   const groupDelay = new Float64Array(numPoints)
   const N = coefficients.length
-  const deltaOmega = Math.PI / (numPoints * 10)
-
   for (let k = 0; k < numPoints; k++) {
-    const freq = (k / numPoints) * (sampleRate / 2)
-    const omega = (2 * Math.PI * freq) / sampleRate
-
-    // Phase at omega and omega + delta
-    const phase1 = evalPhase(coefficients, N, omega)
-    const phase2 = evalPhase(coefficients, N, omega + deltaOmega)
-
-    // Unwrapped phase difference
-    let dPhase = phase2 - phase1
-    while (dPhase > Math.PI) dPhase -= 2 * Math.PI
-    while (dPhase < -Math.PI) dPhase += 2 * Math.PI
-
-    groupDelay[k] = -dPhase / deltaOmega
+    const omega = (2 * Math.PI * ((k / numPoints) * (sampleRate / 2))) / sampleRate
+    let hr = 0, hi = 0, nr = 0, ni = 0
+    for (let n = 0; n < N; n++) {
+      const c = Math.cos(omega * n), s = Math.sin(omega * n)
+      hr += coefficients[n] * c; hi -= coefficients[n] * s
+      nr += n * coefficients[n] * c; ni -= n * coefficients[n] * s
+    }
+    const den = hr * hr + hi * hi
+    groupDelay[k] = den > 1e-20 ? (nr * hr + ni * hi) / den : (N - 1) / 2
   }
-
   return groupDelay
-}
-
-function evalPhase(coefficients: Float64Array, N: number, omega: number): number {
-  let realPart = 0
-  let imagPart = 0
-  for (let n = 0; n < N; n++) {
-    realPart += coefficients[n] * Math.cos(omega * n)
-    imagPart -= coefficients[n] * Math.sin(omega * n)
-  }
-  return Math.atan2(imagPart, realPart)
 }

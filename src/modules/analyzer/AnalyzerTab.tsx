@@ -9,6 +9,7 @@ import { SpectrumCanvas } from './SpectrumCanvas'
 import { WaterfallCanvas } from './WaterfallCanvas'
 import { MarkerOverlay } from './MarkerOverlay'
 import { MarkerTable } from './MarkerTable'
+import { effectiveRbw } from '../../dsp/sweep'
 import { QuickAccessBar } from '../../components/QuickAccessBar'
 import { StatusBar } from '../../components/StatusBar'
 import type { SignalConfig, AnalyzerConfig } from '../../dsp/types'
@@ -54,7 +55,6 @@ export function AnalyzerTab() {
 
   // Send analyzer config to engine when state changes
   useEffect(() => {
-    const fftSize = Math.pow(2, Math.max(8, Math.ceil(Math.log2(analyzerState.span / analyzerState.rbw))))
     const config: AnalyzerConfig = {
       centerFreq: analyzerState.centerFreq,
       span: analyzerState.span,
@@ -62,8 +62,8 @@ export function AnalyzerTab() {
       vbw: analyzerState.vbw,
       refLevel: analyzerState.refLevel,
       scale: analyzerState.scale,
-      fftSize,
-      sampleRate: analyzerState.span * 1.25,
+      fftSize: 0,
+      sampleRate: analyzerState.span * 2.5,
       windowType: analyzerState.windowType,
       detectorType: analyzerState.detectorType,
       sweepMode: analyzerState.sweepMode,
@@ -248,7 +248,8 @@ export function AnalyzerTab() {
 
       {/* Marker table */}
       <MarkerTable markers={liveMarkers} onRemoveMarker={removeMarker}
-        spectrumData={engine.spectrumData} startFreq={analyzerState.startFreq} span={analyzerState.span} />
+        spectrumData={engine.spectrumData} startFreq={analyzerState.startFreq} span={analyzerState.span}
+        rbw={effectiveRbw(analyzerState.span, analyzerState.rbw)} />
 
       {/* Bottom bar: Quick access + Status */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1.5"

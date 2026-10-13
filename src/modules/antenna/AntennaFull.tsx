@@ -203,7 +203,7 @@ export default function AntennaFull() {
               </dd>
               <dt style={{ color: 'var(--sf-text-muted, #8892a4)' }}>Peak SLL</dt>
               <dd style={{ color: 'var(--sf-accent-green, #22c55e)' }}>
-                {result.sidelobeLevel.toFixed(1)} dB
+                {result.sidelobeLevel > -59.9 ? `${result.sidelobeLevel.toFixed(1)} dB` : 'none'}
               </dd>
               <dt style={{ color: 'var(--sf-text-muted, #8892a4)' }}>Directivity</dt>
               <dd style={{ color: 'var(--sf-accent-green, #22c55e)' }}>

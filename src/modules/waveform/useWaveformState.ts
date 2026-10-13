@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
-import { fft, magnitudeSpectrum } from '../../dsp/fft'
+import { fft } from '../../dsp/fft'
+import { createWindow } from '../../dsp/windowing'
 import { generateNoise } from '../../dsp/signals/noise'
 
 export type WaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'chirp' | 'pulse'
@@ -27,7 +28,7 @@ export interface WaveformState {
 const SAMPLE_RATE = 8192
 const NUM_SAMPLES = 1024
 
-function generateSamples(
+export function generateSamples(
   type: WaveformType,
   frequency: number,
   amplitude: number,
@@ -69,7 +70,8 @@ function generateSamples(
 
     case 'chirp': {
       const f0 = frequency
-      const f1 = 4 * frequency
+      // Sweep up to 4× the start frequency, stopping at Nyquist so it never aliases
+      const f1 = Math.min(4 * frequency, sampleRate / 2)
       const duration = numSamples / sampleRate
       for (let n = 0; n < numSamples; n++) {
         const t = n / sampleRate
@@ -99,11 +101,23 @@ function addNoise(samples: Float64Array, noiseLevel: number): Float64Array {
   return result
 }
 
-function computeSpectrum(samples: Float64Array): Float64Array {
+/**
+ * One-sided amplitude spectrum in dB (Hann window, coherent gain removed):
+ * a sine of amplitude A reads 20·log10(A) at its frequency, DC reads 20·log10(|mean|).
+ */
+export function computeSpectrum(samples: Float64Array): Float64Array {
   const N = samples.length
-  const imag = new Float64Array(N)
-  const result = fft(samples, imag)
-  return magnitudeSpectrum(result.real, result.imag, N)
+  const w = createWindow('hann', N + 1) // periodic Hann
+  let wSum = 0
+  const x = new Float64Array(N)
+  for (let i = 0; i < N; i++) { x[i] = samples[i] * w[i]; wSum += w[i] }
+  const { real, imag } = fft(x, new Float64Array(N))
+  const out = new Float64Array(N / 2 + 1)
+  for (let k = 0; k <= N / 2; k++) {
+    const amp = (Math.hypot(real[k], imag[k]) / wSum) * (k === 0 || k === N / 2 ? 1 : 2)
+    out[k] = amp > 1e-8 ? 20 * Math.log10(amp) : -160
+  }
+  return out
 }
 
 function buildFreqAxis(numSamples: number, sampleRate: number): number[] {
