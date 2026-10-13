@@ -311,7 +311,7 @@ export function ModulationFull() {
                 style={{ backgroundColor: 'var(--sf-bg-toolbar)', color: 'var(--sf-text-dim)' }}>
                 Constellation (N/A for Analog)
               </div>
-              <svg width={350} height={350} style={{ backgroundColor: 'var(--sf-bg-control)' }}>
+              <svg viewBox="0 0 350 350" width="100%" style={{ maxWidth: 350, height: 'auto', backgroundColor: 'var(--sf-bg-control)' }}>
                 <text x={175} y={175} fill="var(--sf-text-dim)" fontSize={12}
                   textAnchor="middle" dominantBaseline="middle">
                   Analog mode - no constellation

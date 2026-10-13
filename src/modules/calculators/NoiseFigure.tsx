@@ -82,7 +82,7 @@ export function NoiseFigure() {
 
       <div className="p-3 rounded mb-4" style={{ backgroundColor: 'var(--sf-bg-panel)', border: '1px solid var(--sf-border)' }}>
         <div className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--sf-text-dim)' }}>Cumulative NF per Stage</div>
-        <svg width={chartW} height={chartH}>
+        <svg viewBox={`0 0 ${chartW} ${chartH}`} width="100%" style={{ maxWidth: chartW, height: 'auto' }}>
           {cumulativeNFs.map((nf, i) => {
             const x = 40 + i * (barW + 8)
             const h = (nf / maxNF) * (chartH - 40)

@@ -16,8 +16,10 @@ export function NavBar() {
   // Close the drawer on any navigation, including the back button
   useEffect(() => {
     const close = () => setMenuOpen(false)
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
     window.addEventListener('hashchange', close)
-    return () => window.removeEventListener('hashchange', close)
+    window.addEventListener('keydown', onKey)
+    return () => { window.removeEventListener('hashchange', close); window.removeEventListener('keydown', onKey) }
   }, [])
 
   const linkStyle = (active: boolean) => ({
@@ -27,7 +29,7 @@ export function NavBar() {
   })
 
   return (
-    <header className="relative z-50 shrink-0"
+    <header className="relative z-[55] shrink-0"
       style={{ backgroundColor: 'var(--sf-bg-toolbar)', borderBottom: '1px solid var(--sf-border)' }}>
       <div className="flex items-center gap-2 px-2 h-12">
         <button onClick={() => setMenuOpen(o => !o)} aria-label={menuOpen ? 'Close menu' : 'Open menu'} aria-expanded={menuOpen}

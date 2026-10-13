@@ -71,7 +71,7 @@ export function FresnelZone() {
 
       <div className="p-3 rounded mb-4" style={{ backgroundColor: 'var(--sf-bg-panel)', border: '1px solid var(--sf-border)' }}>
         <div className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--sf-text-dim)' }}>Cross Section at Measurement Point</div>
-        <svg width={svgW} height={svgH}>
+        <svg viewBox={`0 0 ${svgW} ${svgH}`} width="100%" style={{ maxWidth: svgW, height: 'auto' }}>
           {/* Zones (drawn in reverse so zone 1 is on top) */}
           {[...zones].reverse().map((r, ri) => {
             const idx = zones.length - 1 - ri

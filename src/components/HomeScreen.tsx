@@ -5,9 +5,7 @@ export function HomeScreen() {
     <div className="max-w-5xl mx-auto px-4 py-8 sm:py-12">
       <h1 className="text-2xl sm:text-3xl font-semibold" style={{ color: 'var(--sf-accent-blue)' }}>OpenRF-Lab</h1>
       <p className="mt-3 text-sm sm:text-base max-w-2xl leading-relaxed" style={{ color: 'var(--sf-text-muted)' }}>
-        A free, browser-based lab for learning RF and signal processing. Every tool runs on simulated signals,
-        so you need no hardware, and each one has a Learn section explaining the math behind it.
-        Pick a module to start.
+        RF and DSP lessons on simulated signals. No hardware needed.
       </p>
 
       <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

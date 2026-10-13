@@ -81,7 +81,8 @@ export function Tour({ id, steps }: { id: string; steps: TourStep[] }) {
 
   // Card placement: docked to the bottom on phones, otherwise next to the target
   let cardStyle: React.CSSProperties
-  if (narrow) cardStyle = { left: 8, right: 8, bottom: 8 }
+  // Phones: dock to the bottom, or to the top when the target sits in the lower part of the screen
+  if (narrow) cardStyle = rect && rect.bottom > vh - 200 && rect.top > 240 ? { left: 8, right: 8, top: 56 } : { left: 8, right: 8, bottom: 8 }
   else if (!rect) cardStyle = { left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 360 }
   else {
     const left = Math.min(Math.max(8, rect.left), vw - 368)

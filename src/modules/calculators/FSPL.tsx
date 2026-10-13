@@ -68,7 +68,7 @@ export function FSPLCalc() {
 
       <div className="p-3 rounded mb-4" style={{ backgroundColor: 'var(--sf-bg-panel)', border: '1px solid var(--sf-border)' }}>
         <div className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--sf-text-dim)' }}>Loss vs Distance</div>
-        <svg width={chartW} height={chartH}>
+        <svg viewBox={`0 0 ${chartW} ${chartH}`} width="100%" style={{ maxWidth: chartW, height: 'auto' }}>
           {/* Y axis labels */}
           {[0, 0.25, 0.5, 0.75, 1].map(frac => {
             const val = yMin + frac * yRange

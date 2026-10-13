@@ -9,6 +9,23 @@ export interface Marker {
 }
 
 const MAX_MARKERS = 12
+
+/** Trace level (dB) at a frequency, or null when the frequency is off-screen or there is no trace. */
+export function traceLevelAt(spectrum: Float32Array | undefined, startFreq: number, span: number, frequency: number): number | null {
+  if (!spectrum || spectrum.length < 2 || span <= 0) return null
+  const bin = Math.round(((frequency - startFreq) / span) * (spectrum.length - 1))
+  if (bin < 0 || bin >= spectrum.length) return null
+  return spectrum[bin]
+}
+
+/** Markers read the live trace, so their level follows the signal instead of where they were dropped. */
+export function withLiveLevels(markers: Marker[], spectrumData: Map<number, Float32Array>, startFreq: number, span: number): Marker[] {
+  return markers.map(m => {
+    if (m.type === 'band-power') return m
+    const level = traceLevelAt(spectrumData.get(m.traceIndex), startFreq, span, m.frequency)
+    return level === null ? m : { ...m, amplitude: level }
+  })
+}
 let nextId = 1
 
 export function useMarkers() {

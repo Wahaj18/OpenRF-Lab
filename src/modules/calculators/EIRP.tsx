@@ -81,7 +81,7 @@ export function EIRPCalc() {
 
       <details className="text-xs" style={{ color: 'var(--sf-text-muted)' }}>
         <summary className="cursor-pointer mb-1" style={{ color: 'var(--sf-accent-blue)' }}>Learn: EIRP</summary>
-        <p className="mb-1">Effective Isotropic Radiated Power is the total power that would need to be radiated by an isotropic antenna to produce the same signal strength:</p>
+        <p className="mb-1">EIRP is the power an isotropic antenna would need to radiate to match this one:</p>
         <p className="font-mono text-[10px]">EIRP = P_tx + G_antenna - L_cable</p>
         <p className="mt-1">Regulatory bodies like the FCC set EIRP limits per frequency band to prevent interference.</p>
       </details>

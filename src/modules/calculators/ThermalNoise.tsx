@@ -71,7 +71,7 @@ export function ThermalNoiseCalc() {
         <div className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--sf-text-dim)' }}>
           Noise Floor vs Bandwidth (T = {temperature} K)
         </div>
-        <svg width={chartW} height={chartH}>
+        <svg viewBox={`0 0 ${chartW} ${chartH}`} width="100%" style={{ maxWidth: chartW, height: 'auto' }}>
           {chartData.map((d, i) => {
             const x = 60 + i * (barW + 6)
             const normalized = (d.noise - noiseMin) / noiseRange

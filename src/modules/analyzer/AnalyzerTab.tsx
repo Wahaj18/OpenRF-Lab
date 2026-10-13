@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSignalEngine } from '../../hooks/useSignalEngine'
 import { useAnalyzerState } from '../../hooks/useAnalyzerState'
 import { useTraces } from '../../hooks/useTraces'
-import { useMarkers } from '../../hooks/useMarkers'
+import { useMarkers, withLiveLevels } from '../../hooks/useMarkers'
 import { ControlSidebar } from './ControlSidebar'
 import { SignalDialog } from './SignalDialog'
 import { SpectrumCanvas } from './SpectrumCanvas'
@@ -17,7 +17,7 @@ const PRESET_SIGNALS: SignalConfig[] = [
   { id: 'sig-1', enabled: true, type: 'cw', params: { frequency: 2.437e9, powerDbm: -20, phase: 0 } },
   { id: 'sig-2', enabled: true, type: 'cw', params: { frequency: 2.412e9, powerDbm: -35, phase: 0 } },
   { id: 'sig-3', enabled: true, type: 'cw', params: { frequency: 2.462e9, powerDbm: -30, phase: 0 } },
-  { id: 'sig-4', enabled: true, type: 'noise', params: { noiseType: 'awgn', powerDbm: -80 } },
+  { id: 'sig-4', enabled: true, type: 'noise', params: { noiseType: 'awgn', powerDbm: -55 } },
 ]
 
 export function AnalyzerTab() {
@@ -165,6 +165,8 @@ export function AnalyzerTab() {
     addMarker(frequency, amplitude, 0)
   }, [addMarker])
 
+  const liveMarkers = withLiveLevels(markers, engine.spectrumData, analyzerState.startFreq, analyzerState.span)
+
   // Layout: 60% spectrum, 40% waterfall
   const spectrumHeight = Math.floor(containerSize.height * 0.6)
   const waterfallHeight = containerSize.height - spectrumHeight
@@ -213,7 +215,7 @@ export function AnalyzerTab() {
             <MarkerOverlay
               width={containerSize.width}
               height={spectrumHeight}
-              markers={markers}
+              markers={liveMarkers}
               startFreq={analyzerState.startFreq}
               stopFreq={analyzerState.stopFreq}
               refLevel={analyzerState.refLevel}
@@ -225,7 +227,7 @@ export function AnalyzerTab() {
           {signals.length === 0 && (
             <div className="absolute inset-x-0 top-1/4 flex justify-center pointer-events-none px-4">
               <span className="text-xs text-center rounded px-3 py-2" style={{ color: 'var(--sf-text-muted)', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-                No signals yet. Add one from Signal Simulator in the controls.
+                No signals. Use + Signal in Signal Simulator.
               </span>
             </div>
           )}
@@ -245,7 +247,7 @@ export function AnalyzerTab() {
       </div>
 
       {/* Marker table */}
-      <MarkerTable markers={markers} onRemoveMarker={removeMarker}
+      <MarkerTable markers={liveMarkers} onRemoveMarker={removeMarker}
         spectrumData={engine.spectrumData} startFreq={analyzerState.startFreq} span={analyzerState.span} />
 
       {/* Bottom bar: Quick access + Status */}

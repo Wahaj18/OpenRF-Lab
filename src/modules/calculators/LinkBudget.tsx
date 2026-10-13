@@ -52,19 +52,19 @@ function WaterfallChart({ params, result }: { params: Params; result: { received
   const gap = 4
 
   return (
-    <svg width={barWidth + 120} height={(barH + gap) * items.length + 10} className="mt-2">
+    <svg viewBox={`0 0 ${barWidth + 140} ${(barH + gap) * items.length + 10}`} width="100%" className="mt-2"
+      style={{ maxWidth: barWidth + 140 }} role="img" aria-label="Link budget gains and losses">
       {items.map((item, i) => {
-        const w = (Math.abs(item.value) / maxAbs) * (barWidth * 0.7)
-        const x = item.value >= 0 ? 80 : 80 - w
+        // Bar length is the magnitude; colour shows gain (green) or loss (red)
+        const w = Math.max(1, (Math.abs(item.value) / maxAbs) * barWidth * 0.8)
         return (
           <g key={i} transform={`translate(0, ${i * (barH + gap)})`}>
             <text x={76} y={barH / 2 + 4} textAnchor="end" fontSize={10} fill="var(--sf-text-muted)">
               {item.label}
             </text>
-            <rect x={x} y={2} width={w} height={barH - 4} rx={2}
+            <rect x={80} y={2} width={w} height={barH - 4} rx={2}
               fill={item.value >= 0 ? 'var(--sf-accent-green)' : 'var(--sf-marker-red)'} opacity={0.7} />
-            <text x={80 + (item.value >= 0 ? w + 4 : -w - 4)} y={barH / 2 + 4}
-              textAnchor={item.value >= 0 ? 'start' : 'end'} fontSize={10} fill="var(--sf-text-primary)">
+            <text x={84 + w} y={barH / 2 + 4} textAnchor="start" fontSize={10} fill="var(--sf-text-primary)">
               {item.value >= 0 ? '+' : ''}{item.value.toFixed(1)} dB
             </text>
           </g>

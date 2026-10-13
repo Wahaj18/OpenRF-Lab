@@ -11,13 +11,13 @@ export interface TabDef {
 }
 
 export const ALL_TABS: TabDef[] = [
-  { id: 'analyzer', label: 'Spectrum Analyzer', icon: '▦', description: 'Read spectra and waterfalls, use markers, traces and detectors like a bench analyzer.' },
-  { id: 'waveform', label: 'Waveform Designer', icon: '∿', description: 'Build sine, square, chirp and pulse signals and see them in time and frequency.' },
-  { id: 'modulation', label: 'Modulation Explorer', icon: '◎', description: 'Explore AM, FM and BPSK to 256-QAM constellations and how SNR affects them.' },
-  { id: 'filter', label: 'Filter Designer', icon: '⋈', description: 'Design windowed FIR filters and inspect magnitude, phase and group delay.' },
-  { id: 'channelizer', label: 'Polyphase Channelizer', icon: '☰', description: 'See how a polyphase filter bank splits a band into channels efficiently.' },
-  { id: 'antenna', label: 'Antenna Pattern Viewer', icon: '⊛', description: 'Compare dipole, patch, horn and array patterns, tapering and beam steering.' },
-  { id: 'calculators', label: 'RF Calculators', icon: '⊞', description: 'Work through link budgets, path loss, noise figure, EIRP and dB conversions.' },
+  { id: 'analyzer', label: 'Spectrum Analyzer', icon: '▦', description: 'Spectrum, waterfall, markers and traces.' },
+  { id: 'waveform', label: 'Waveform Designer', icon: '∿', description: 'Time and frequency views of common waveforms.' },
+  { id: 'modulation', label: 'Modulation Explorer', icon: '◎', description: 'AM, FM and BPSK to 256-QAM.' },
+  { id: 'filter', label: 'Filter Designer', icon: '⋈', description: 'Windowed FIR filter design.' },
+  { id: 'channelizer', label: 'Polyphase Channelizer', icon: '☰', description: 'Polyphase filter bank channelization.' },
+  { id: 'antenna', label: 'Antenna Pattern Viewer', icon: '⊛', description: 'Dipole, patch, horn and array patterns.' },
+  { id: 'calculators', label: 'RF Calculators', icon: '⊞', description: 'Link budget, path loss, noise figure, EIRP.' },
 ]
 
 const ROUTES = new Set<string>(['home', ...ALL_TABS.map(t => t.id)])
