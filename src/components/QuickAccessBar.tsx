@@ -7,7 +7,7 @@ interface Props { state: AnalyzerStateValues; traces: TraceState[] }
 export function QuickAccessBar({ state, traces }: Props) {
   const activeTraces = traces.filter(t => t.enabled)
   return (
-    <div className="flex gap-4 items-center px-3 py-1.5 flex-wrap text-[11px]"
+    <div className="flex gap-x-4 gap-y-1 items-center px-3 py-1.5 flex-wrap text-[11px] basis-full sm:basis-auto sm:flex-1 min-w-0 whitespace-nowrap"
       style={{ backgroundColor: 'var(--sf-bg-toolbar)', borderTop: '1px solid var(--sf-border)' }}>
       <Param label="Center" value={formatFrequency(state.centerFreq)} />
       <Param label="Span" value={formatFrequency(state.span)} />

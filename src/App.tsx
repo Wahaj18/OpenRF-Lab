@@ -1,7 +1,10 @@
 import { ThemeProvider } from './app/ThemeProvider'
 import { TabManagerProvider, useTabManager } from './app/TabManager'
 import { SignalEngineProvider } from './hooks/useSignalEngine'
-import { TabBar } from './components/TabBar'
+import { NavBar } from './components/NavBar'
+import { HomeScreen } from './components/HomeScreen'
+import { Tour } from './tour/Tour'
+import { TOURS } from './tour/steps'
 import { AnalyzerTab } from './modules/analyzer/AnalyzerTab'
 import { CalculatorsTab } from './modules/calculators/CalculatorsTab'
 import { WaveformFull } from './modules/waveform/WaveformFull'
@@ -14,17 +17,19 @@ function AppContent() {
   const { activeTab } = useTabManager()
 
   return (
-    <div className="h-screen flex flex-col" style={{
+    <div className="h-dvh flex flex-col overflow-x-hidden" style={{
       backgroundColor: 'var(--sf-bg-primary)',
-      border: '1px solid var(--sf-border)',
       boxSizing: 'border-box',
     }}>
-      <TabBar />
+      <NavBar />
+      {TOURS[activeTab] && <Tour key={activeTab} id={activeTab} steps={TOURS[activeTab]!} />}
       {activeTab === 'analyzer' ? (
         <AnalyzerTab />
       ) : (
         <div className="flex-1 overflow-y-auto">
-          {activeTab === 'calculators' ? (
+          {activeTab === 'home' ? (
+            <HomeScreen />
+          ) : activeTab === 'calculators' ? (
             <CalculatorsTab />
           ) : activeTab === 'waveform' ? (
             <WaveformFull />

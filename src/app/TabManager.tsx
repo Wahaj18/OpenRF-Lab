@@ -1,30 +1,37 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, type ReactNode } from 'react'
 
 export type TabId = 'analyzer' | 'calculators' | 'waveform' | 'modulation' | 'filter' | 'channelizer' | 'antenna'
+export type RouteId = 'home' | TabId
 
 export interface TabDef {
   id: TabId
   label: string
   icon: string
-  closable: boolean
+  description: string
 }
 
 export const ALL_TABS: TabDef[] = [
-  { id: 'analyzer', label: 'Spectrum Analyzer', icon: '▦', closable: false },
-  { id: 'calculators', label: 'RF Calculators', icon: '⊞', closable: true },
-  { id: 'waveform', label: 'Waveform Designer', icon: '∿', closable: true },
-  { id: 'modulation', label: 'Modulation Explorer', icon: '◎', closable: true },
-  { id: 'filter', label: 'Filter Designer', icon: '⋈', closable: true },
-  { id: 'channelizer', label: 'Channelizer Demo', icon: '⫼', closable: true },
-  { id: 'antenna', label: 'Antenna Pattern', icon: '⊛', closable: true },
+  { id: 'analyzer', label: 'Spectrum Analyzer', icon: '▦', description: 'Read spectra and waterfalls, use markers, traces and detectors like a bench analyzer.' },
+  { id: 'waveform', label: 'Waveform Designer', icon: '∿', description: 'Build sine, square, chirp and pulse signals and see them in time and frequency.' },
+  { id: 'modulation', label: 'Modulation Explorer', icon: '◎', description: 'Explore AM, FM and BPSK to 256-QAM constellations and how SNR affects them.' },
+  { id: 'filter', label: 'Filter Designer', icon: '⋈', description: 'Design windowed FIR filters and inspect magnitude, phase and group delay.' },
+  { id: 'channelizer', label: 'Polyphase Channelizer', icon: '☰', description: 'See how a polyphase filter bank splits a band into channels efficiently.' },
+  { id: 'antenna', label: 'Antenna Pattern Viewer', icon: '⊛', description: 'Compare dipole, patch, horn and array patterns, tapering and beam steering.' },
+  { id: 'calculators', label: 'RF Calculators', icon: '⊞', description: 'Work through link budgets, path loss, noise figure, EIRP and dB conversions.' },
 ]
 
+const ROUTES = new Set<string>(['home', ...ALL_TABS.map(t => t.id)])
+
+function routeFromHash(): RouteId {
+  const id = window.location.hash.replace(/^#\/?/, '')
+  return ROUTES.has(id) ? (id as RouteId) : 'home'
+}
+
 interface TabManagerContextValue {
-  openTabs: TabId[]
-  activeTab: TabId
-  setActiveTab: (id: TabId) => void
+  activeTab: RouteId
+  setActiveTab: (id: RouteId) => void
+  /** Kept for modules that link to each other */
   openTab: (id: TabId) => void
-  closeTab: (id: TabId) => void
 }
 
 const TabManagerContext = createContext<TabManagerContextValue>(null!)
@@ -34,27 +41,19 @@ export function useTabManager() {
 }
 
 export function TabManagerProvider({ children }: { children: ReactNode }) {
-  const [openTabs, setOpenTabs] = useState<TabId[]>(ALL_TABS.map(t => t.id))
-  const [activeTab, setActiveTab] = useState<TabId>('analyzer')
+  const [activeTab, setRoute] = useState<RouteId>(routeFromHash)
 
-  const openTab = useCallback((id: TabId) => {
-    setOpenTabs(prev => prev.includes(id) ? prev : [...prev, id])
-    setActiveTab(id)
+  useEffect(() => {
+    const onHash = () => { setRoute(routeFromHash()); window.scrollTo(0, 0) }
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
-  const closeTab = useCallback((id: TabId) => {
-    const def = ALL_TABS.find(t => t.id === id)
-    if (!def?.closable) return
-    setOpenTabs(prev => {
-      const next = prev.filter(t => t !== id)
-      setActiveTab(current => current === id ? next[next.length - 1] : current)
-      return next
-    })
+  const setActiveTab = useCallback((id: RouteId) => {
+    const next = `#/${id === 'home' ? '' : id}`
+    if (window.location.hash !== next) window.location.hash = next
   }, [])
 
-  return (
-    <TabManagerContext.Provider value={{ openTabs, activeTab, setActiveTab, openTab, closeTab }}>
-      {children}
-    </TabManagerContext.Provider>
-  )
+  const value = useMemo(() => ({ activeTab, setActiveTab, openTab: setActiveTab }), [activeTab, setActiveTab])
+  return <TabManagerContext.Provider value={value}>{children}</TabManagerContext.Provider>
 }

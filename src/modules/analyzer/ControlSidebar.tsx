@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { CONTROLS_EVENT } from '../../tour/Tour'
 import { FrequencyControls } from './FrequencyControls'
 import { AmplitudeControls } from './AmplitudeControls'
 import { BandwidthControls } from './BandwidthControls'
@@ -17,10 +18,10 @@ interface Props {
   onMarkerToCenter: () => void; onNdbBw: () => void; onBandPower: () => void; onClearAllMarkers: () => void
 }
 
-function Section({ title, color, children, defaultOpen = true }: { title: string; color?: string; children: ReactNode; defaultOpen?: boolean }) {
+function Section({ title, color, children, tour, defaultOpen = true }: { title: string; color?: string; children: ReactNode; tour?: string; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <div style={{ borderBottom: '1px solid var(--sf-border)' }}>
+    <div data-tour={tour} style={{ borderBottom: '1px solid var(--sf-border)' }}>
       <button onClick={() => setOpen(!open)} className="w-full flex justify-between items-center px-3 py-2.5 text-[10px] font-semibold tracking-wider cursor-pointer"
         style={{ backgroundColor: 'var(--sf-bg-toolbar)', color: color ?? 'var(--sf-accent-blue)', border: 'none' }}>
         {title} <span style={{ color: 'var(--sf-text-dim)' }}>{open ? '▾' : '▸'}</span>
@@ -32,12 +33,17 @@ function Section({ title, color, children, defaultOpen = true }: { title: string
 
 export function ControlSidebar(props: Props) {
   const [open, setOpen] = useState(false)
+  useEffect(() => {
+    const onTour = (e: Event) => setOpen((e as CustomEvent<boolean>).detail)
+    window.addEventListener(CONTROLS_EVENT, onTour)
+    return () => window.removeEventListener(CONTROLS_EVENT, onTour)
+  }, [])
   return (
     <>
       {/* Mobile toggle button — positioned below tab bar, not overlapping it */}
       <button onClick={() => setOpen(!open)}
-        className="md:hidden fixed left-2 z-50 px-2 py-1 rounded text-[10px] font-semibold"
-        style={{ top: 44, backgroundColor: 'var(--sf-accent-blue)', color: 'var(--sf-bg-primary)', border: 'none' }}>
+        className="md:hidden fixed right-2 top-14 z-50 px-4 min-h-11 rounded-full text-xs font-semibold shadow-lg"
+        style={{ backgroundColor: 'var(--sf-accent-blue)', color: 'var(--sf-bg-primary)', border: 'none' }}>
         {open ? '✕ Close' : '☰ Controls'}
       </button>
       {open && (
@@ -45,17 +51,17 @@ export function ControlSidebar(props: Props) {
           className="md:hidden fixed inset-0 z-30"
           style={{ backgroundColor: 'rgba(0,0,0,0.4)', border: 'none' }} />
       )}
-      <div className={`flex-col overflow-y-auto text-[11px] ${open ? 'fixed left-0 right-0 bottom-0 z-40 flex' : 'hidden'} md:relative md:flex md:top-auto md:inset-auto`}
-        style={{ top: 40, width: 230, maxWidth: '85vw', backgroundColor: 'var(--sf-bg-panel)', borderRight: '1px solid var(--sf-border)' }}>
-      <Section title="FREQUENCY"><FrequencyControls state={props.analyzerState} /></Section>
+      <div className={`flex-col overflow-y-auto text-[11px] pb-72 md:pb-0 ${open ? 'fixed left-0 right-0 bottom-0 z-40 flex' : 'hidden'} md:relative md:flex md:top-auto md:inset-auto`}
+        style={{ top: 48, width: 230, maxWidth: '85vw', backgroundColor: 'var(--sf-bg-panel)', borderRight: '1px solid var(--sf-border)' }}>
+      <Section title="FREQUENCY" tour="frequency"><FrequencyControls state={props.analyzerState} /></Section>
       <Section title="AMPLITUDE"><AmplitudeControls state={props.analyzerState} /></Section>
-      <Section title="BW / SWEEP"><BandwidthControls state={props.analyzerState} /></Section>
-      <Section title="TRACES"><TraceControls traces={props.traces} setTraceMode={props.setTraceMode} /></Section>
-      <Section title="MARKERS">
+      <Section title="BW / SWEEP" tour="bandwidth"><BandwidthControls state={props.analyzerState} /></Section>
+      <Section title="TRACES" tour="traces"><TraceControls traces={props.traces} setTraceMode={props.setTraceMode} /></Section>
+      <Section title="MARKERS" tour="markers">
         <MarkerControls onAddMarker={props.onAddMarker} onAddDelta={props.onAddDelta} onPeakSearch={props.onPeakSearch}
           onMarkerToCenter={props.onMarkerToCenter} onNdbBw={props.onNdbBw} onBandPower={props.onBandPower} onClearAll={props.onClearAllMarkers} />
       </Section>
-      <Section title="SIGNAL SIMULATOR" color="var(--sf-accent-green)">
+      <Section title="SIGNAL SIMULATOR" color="var(--sf-accent-green)" tour="signals">
         <SignalSimControls signals={props.signals} onToggleSignal={props.onToggleSignal}
           onAddSignal={props.onAddSignal} onEditSignal={props.onEditSignal} onLoadPreset={props.onLoadPreset} />
       </Section>

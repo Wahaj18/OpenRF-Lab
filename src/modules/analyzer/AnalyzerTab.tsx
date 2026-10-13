@@ -13,7 +13,7 @@ import { QuickAccessBar } from '../../components/QuickAccessBar'
 import { StatusBar } from '../../components/StatusBar'
 import type { SignalConfig, AnalyzerConfig } from '../../dsp/types'
 
-const DEFAULT_SIGNALS: SignalConfig[] = [
+const PRESET_SIGNALS: SignalConfig[] = [
   { id: 'sig-1', enabled: true, type: 'cw', params: { frequency: 2.437e9, powerDbm: -20, phase: 0 } },
   { id: 'sig-2', enabled: true, type: 'cw', params: { frequency: 2.412e9, powerDbm: -35, phase: 0 } },
   { id: 'sig-3', enabled: true, type: 'cw', params: { frequency: 2.462e9, powerDbm: -30, phase: 0 } },
@@ -29,7 +29,7 @@ export function AnalyzerTab() {
     addNdbMarker, removeMarker, moveMarker, clearAllMarkers, peakSearch,
   } = useMarkers()
 
-  const [signals, setSignals] = useState<SignalConfig[]>(DEFAULT_SIGNALS)
+  const [signals, setSignals] = useState<SignalConfig[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingSignal, setEditingSignal] = useState<SignalConfig | null>(null)
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 })
@@ -123,7 +123,7 @@ export function AnalyzerTab() {
   }, [])
 
   const handleLoadPreset = useCallback(() => {
-    setSignals(DEFAULT_SIGNALS)
+    setSignals(PRESET_SIGNALS)
   }, [])
 
   const handleAddMarker = useCallback(() => {
@@ -193,9 +193,9 @@ export function AnalyzerTab() {
         />
 
         {/* Center display area */}
-        <div ref={containerRef} className="flex-1 flex flex-col relative overflow-visible md:overflow-hidden p-2 gap-1 min-h-[600px] md:min-h-0">
+        <div ref={containerRef} className="flex-1 min-w-0 flex flex-col relative overflow-hidden p-2 gap-1 min-h-[480px] md:min-h-0">
           {/* Spectrum + marker overlay */}
-          <div className="relative" style={{ height: spectrumHeight }}>
+          <div className="relative" data-tour="spectrum" style={{ height: spectrumHeight }}>
             <SpectrumCanvas
               width={containerSize.width}
               height={spectrumHeight}
@@ -222,7 +222,16 @@ export function AnalyzerTab() {
             />
           </div>
 
+          {signals.length === 0 && (
+            <div className="absolute inset-x-0 top-1/4 flex justify-center pointer-events-none px-4">
+              <span className="text-xs text-center rounded px-3 py-2" style={{ color: 'var(--sf-text-muted)', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                No signals yet. Add one from Signal Simulator in the controls.
+              </span>
+            </div>
+          )}
+
           {/* Waterfall */}
+          <div data-tour="waterfall">
           <WaterfallCanvas
             width={containerSize.width}
             height={waterfallHeight}
@@ -231,6 +240,7 @@ export function AnalyzerTab() {
             scale={analyzerState.scale}
             numDivY={10}
           />
+          </div>
         </div>
       </div>
 
@@ -239,7 +249,7 @@ export function AnalyzerTab() {
         spectrumData={engine.spectrumData} startFreq={analyzerState.startFreq} span={analyzerState.span} />
 
       {/* Bottom bar: Quick access + Status */}
-      <div className="flex items-center px-3 py-1.5"
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1.5"
         style={{ backgroundColor: 'var(--sf-bg-toolbar)', borderTop: '1px solid var(--sf-border)' }}>
         <QuickAccessBar state={analyzerState} traces={traces} />
         <StatusBar isRunning={engine.isRunning} sweepCount={engine.sweepCount}

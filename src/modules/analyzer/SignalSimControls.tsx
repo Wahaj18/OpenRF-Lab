@@ -21,7 +21,7 @@ export function SignalSimControls({ signals, onToggleSignal, onAddSignal, onEdit
       ))}
       <div className="flex gap-1">
         <button onClick={onAddSignal} className="flex-1 rounded text-[10px] px-2 py-1 cursor-pointer"
-          style={{ backgroundColor: 'var(--sf-accent-green)', color: '#000', opacity: 0.2, border: '1px solid var(--sf-accent-green)' }}>+ Signal</button>
+          style={{ backgroundColor: 'var(--sf-accent-green)', color: '#000', border: '1px solid var(--sf-accent-green)' }}>+ Signal</button>
         <button onClick={onLoadPreset} className="rounded text-[10px] px-2 py-1 cursor-pointer"
           style={{ backgroundColor: 'var(--sf-bg-control)', border: '1px solid var(--sf-border)', color: 'var(--sf-text-muted)' }}>Presets</button>
       </div>
